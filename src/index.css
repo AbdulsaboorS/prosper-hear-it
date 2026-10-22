@@ -116,15 +116,21 @@ blockquote.cold { background: #eef0f2; color: #5b6670; font-family: ui-monospace
 .cta-bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(920px, calc(100% - 32px)); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 12px 12px 22px; background: var(--navy); color: #e8f0f5; border-radius: 999px; box-shadow: 0 12px 40px rgba(1, 54, 83, 0.25); font-size: 14px; animation: rise 0.35s ease both; z-index: 5; }
 .cta-bar strong { color: #fff; }
 .modal { position: fixed; inset: 0; background: rgba(20, 20, 20, 0.35); display: grid; place-items: center; padding: 16px; z-index: 10; animation: rise 0.2s ease both; }
-.brief { width: min(560px, 100%); background: var(--navy); color: #e8f0f5; border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; gap: 14px; }
-.brief .eyebrow { color: #ffb59f; }
-.brief h3 { color: #fff; font-size: 22px; }
-.brief dl { display: grid; grid-template-columns: 170px 1fr; gap: 8px 14px; margin: 0; font-size: 14px; line-height: 1.45; }
-.brief dt { color: #9fb7c6; font-weight: 600; }
-.brief dd { margin: 0; }
-.brief .muted { color: #9fb7c6; }
+.brief { width: min(540px, 100%); padding: 26px; }
+.brief form, .brief .sent { display: flex; flex-direction: column; gap: 14px; }
+.brief h3 { font-size: 24px; }
+.brief label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); flex: 1; }
+.brief input { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px; color: var(--ink); background: var(--card); outline: 0; }
+.brief input[readonly] { background: var(--bg-soft); }
+.brief input:focus { border-color: var(--accent); }
+.field-row { display: flex; gap: 10px; }
+.interest { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.interest > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.brief .primary { align-self: flex-start; }
 .brief-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.brief .ghost { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.3); }
+.sent { align-items: flex-start; }
+.check { width: 44px; height: 44px; border-radius: 50%; background: var(--teal); color: #fff; font-size: 22px; display: grid; place-items: center; }
 
 .footer { text-align: center; font-size: 12px; color: var(--muted); line-height: 1.6; }
 
@@ -135,7 +141,7 @@ blockquote.cold { background: #eef0f2; color: #5b6670; font-family: ui-monospace
   .personalize { flex-wrap: wrap; border-radius: 18px; }
   .personalize select { border-left: 0; padding: 8px 14px; }
   .cta-bar { border-radius: 18px; flex-direction: column; align-items: stretch; text-align: center; }
-  .brief dl { grid-template-columns: 1fr; }
+  .field-row { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

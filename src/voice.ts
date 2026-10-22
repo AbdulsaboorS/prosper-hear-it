@@ -38,7 +38,7 @@ export class Speaker {
     }
   }
 
-  // The deliberately flat "cold" voice for the comparison.
+  // The "cold" phone-menu voice for the comparison.
   speakRobot(text: string) {
     const gen = ++this.generation
     return this.speakBrowser(text, gen, true)
@@ -89,11 +89,10 @@ export class Speaker {
       if (gen !== this.generation) return resolve()
       const u = new SpeechSynthesisUtterance(text)
       const voices = speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'))
+      // The cold voice is the stock system voice, like a phone menu; the warm fallback prefers newer voices.
       u.voice = robot
-        ? voices.find((v) => /Fred|Ralph|Albert/.test(v.name)) ?? voices[0] ?? null
-        : voices.find((v) => /Samantha|Google US English|Ava|Allison/.test(v.name)) ?? voices[0] ?? null
-      u.rate = robot ? 1.05 : 1
-      u.pitch = robot ? 0.7 : 1
+        ? voices.find((v) => /Samantha|Google US English/.test(v.name)) ?? voices[0] ?? null
+        : voices.find((v) => /Ava|Allison|Samantha|Google US English/.test(v.name)) ?? voices[0] ?? null
       u.onend = () => resolve()
       u.onerror = () => resolve()
       speechSynthesis.speak(u)

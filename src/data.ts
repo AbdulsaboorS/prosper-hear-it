@@ -140,7 +140,7 @@ export function sampleCall(id: AgentId, practice: string, s: Specialty): Line[] 
 export function greeting(practice: string, s: Specialty, warm: boolean): string {
   const p = practice || 'your practice'
   if (!warm) {
-    return `Thank you for calling ${p}. Please state the reason for your call. For scheduling, say scheduling. For billing, say billing. Please hold while I process your request.`
+    return `Thank you for calling ${p}. For scheduling, press one. For billing, press two. For all other questions, please stay on the line.`
   }
   return `Hi Maria, thanks for calling ${p}, this is Anna. I see you're due for your ${s.visit}. I know scheduling can be stressful, so let's find a time that actually works for you. And if ${s.human}, I'll get you to someone on our team right away.`
 }

@@ -81,7 +81,7 @@ export default function App() {
             <h1>Hear it at your practice <span className="muted">· a Prosper AI concept</span></h1>
             <p className="credit">
               Unofficial prototype by{' '}
-              <a href="https://abdulsaboorshaikh.com" target="_blank" rel="noreferrer">Abdul Saboor Shaikh</a> ·{' '}
+              <a href="https://abdulsaboorshaikh.com" target="_blank" rel="noreferrer">Abdulsaboor Shaikh</a> ·{' '}
               <a href="https://linkedin.com/in/abdulsaboorshaikh" target="_blank" rel="noreferrer">LinkedIn</a>
             </p>
           </div>
@@ -228,24 +228,57 @@ function AgentGroup(props: {
 }
 
 function Brief({ practice, specialty, heard, onClose }: { practice: string; specialty: string; heard: AgentId[]; onClose: () => void }) {
-  const agents = heard.map((id) => AGENTS.find((ag) => ag.id === id)!)
-  const rcm = agents.some((ag) => ag.with === 'payer')
+  const [interested, setInterested] = useState<AgentId[]>(heard)
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState(false)
+  const first = AGENTS.find((ag) => ag.id === interested[0])
+
   return (
-    <div className="modal" role="dialog" aria-modal="true" aria-label="Demo request" onClick={onClose}>
-      <div className="brief" onClick={(e) => e.stopPropagation()}>
-        <div className="eyebrow">What Prosper's sales team would receive</div>
-        <h3>{practice || 'New practice'} · demo request</h3>
-        <dl>
-          <dt>Practice</dt><dd>{practice || 'Not given'} ({specialty})</dd>
-          <dt>Agents they listened to</dt><dd>{agents.map((ag) => `${ag.name} (${ag.role})`).join(', ')}</dd>
-          <dt>Interest signal</dt><dd>{rcm ? 'Revenue cycle: listened to payer-side agents' : 'Patient access: listened to front-desk agents'}</dd>
-          <dt>Suggested demo opener</dt><dd>Start with {agents[0]?.name}, the first agent they played.</dd>
-        </dl>
-        <p className="muted small">Prototype: nothing is sent. In production this would prefill the demo form.</p>
-        <div className="brief-actions">
-          <a className="primary" href="https://www.getprosper.ai/get-started" target="_blank" rel="noreferrer">Continue to Prosper's Get Started →</a>
-          <button className="ghost" onClick={onClose}>Keep listening</button>
-        </div>
+    <div className="modal" role="dialog" aria-modal="true" aria-label="Book a demo" onClick={onClose}>
+      <div className="brief card" onClick={(e) => e.stopPropagation()}>
+        {sent ? (
+          <div className="sent">
+            <div className="check" aria-hidden>✓</div>
+            <h3>Thanks! We'll start your demo with {first?.name ?? 'your agents'}.</h3>
+            <p className="muted">Someone from Prosper will reach out to {email} within a business day.</p>
+            <p className="muted small">Prototype: nothing was sent.</p>
+            <div className="brief-actions">
+              <a className="primary" href="https://www.getprosper.ai/get-started" target="_blank" rel="noreferrer">Continue to Prosper's Get Started →</a>
+              <button className="ghost" onClick={onClose}>Close</button>
+            </div>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              setSent(true)
+            }}
+          >
+            <div className="eyebrow">Book a demo</div>
+            <h3>Hear them on {practice || 'your practice'}'s real calls</h3>
+            <div className="field-row">
+              <label>Practice<input value={practice || ''} placeholder="Your practice" readOnly /></label>
+              <label>Specialty<input value={specialty} readOnly /></label>
+            </div>
+            <div className="interest">
+              <span>Agents you're interested in</span>
+              <div>
+                {AGENTS.filter((ag) => heard.includes(ag.id) || interested.includes(ag.id)).map((ag) => {
+                  const on = interested.includes(ag.id)
+                  return (
+                    <button type="button" key={ag.id} className={`chip ${on ? 'on' : ''}`}
+                      onClick={() => setInterested((xs) => (on ? xs.filter((x) => x !== ag.id) : [...xs, ag.id]))}>
+                      {on ? '✓ ' : ''}{ag.name} · {ag.role}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <label className="email">Work email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@practice.com" /></label>
+            <button className="primary" type="submit">Request demo</button>
+            <p className="muted small">Our team sees which agents you listened to, so your demo starts with what matters to you.</p>
+          </form>
+        )}
       </div>
     </div>
   )

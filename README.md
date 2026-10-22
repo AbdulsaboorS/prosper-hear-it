@@ -4,7 +4,7 @@
 
 A visitor types their practice name and specialty. Every Prosper agent then plays a short call for *that* practice, with its patients and payers, in its own voice. Anna's greeting has a **Cold / Warm** toggle, so the visitor hears the difference between a phone tree and an agent that sounds like their own front desk.
 
-This is an unofficial concept by [Abdul Saboor Shaikh](https://abdulsaboorshaikh.com) ([LinkedIn](https://linkedin.com/in/abdulsaboorshaikh)). All data is mock: no PHI, and nothing is stored or sent.
+This is an unofficial concept by [Abdulsaboor Shaikh](https://abdulsaboorshaikh.com) ([LinkedIn](https://linkedin.com/in/abdulsaboorshaikh)). All data is mock: no PHI, and nothing is stored or sent.
 
 ## Why
 
