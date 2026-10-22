@@ -20,25 +20,19 @@ const STEP_FIELDS: Record<string, { fields: Record<string, unknown>; rule: strin
     fields: {
       name: { type: 'string', description: "The speaker's first name" },
       practice: { type: 'string', description: 'Practice name, properly capitalized' },
-      specialty: { type: 'string', description: 'Medical specialty, e.g. Dermatology, OB-GYN, Gastroenterology' },
+      specialty: { type: 'string', description: 'Medical specialty, title case, e.g. Dermatology, OB-GYN, Gastroenterology' },
       providers: { type: 'integer', description: 'Number of providers, if mentioned' },
+      ehr: { type: 'string', enum: ['athenahealth', 'ModMed', 'eClinicalWorks', 'Epic', 'NextGen', 'Other'], description: 'Their EHR, if mentioned; any unlisted EHR is "Other"' },
     },
-    rule: 'Extract every field they mention, including their first name ("I\'m Abdul" -> name "Abdul"). advance=true once practice or specialty is known. If the practice name is missing, advance=false and ask for it.',
+    rule: 'Extract every field they mention, including their first name ("I\'m Abdul" -> name "Abdul"). advance=true once practice or specialty is known. If both are missing, advance=false and ask for them.',
   },
   calls: {
-    fields: { callTypes: { type: 'array', items: { type: 'string', enum: CALL_TYPES } } },
-    rule: 'Map what they describe onto callTypes ("prior auths" -> priorAuth, "claims", "denials" -> claims, "insurance verification" -> benefits, "phones ringing off the hook / routing" -> switchboard). advance=true if at least one.',
-  },
-  ehr: {
-    fields: { ehr: { type: 'string', enum: ['athenahealth', 'ModMed', 'eClinicalWorks', 'Epic', 'NextGen', 'Other'] } },
-    rule: 'advance=true if an EHR is named; any unlisted EHR is "Other".',
-  },
-  volume: {
     fields: {
+      callTypes: { type: 'array', items: { type: 'string', enum: CALL_TYPES } },
       painTimes: { type: 'array', items: { type: 'string', enum: ['mornings', 'lunch', 'after hours', 'all day'] } },
-      callsPerDay: { type: 'integer' },
+      callsPerDay: { type: 'integer', description: 'Calls per day, if mentioned ("over a thousand" -> 1000)' },
     },
-    rule: 'advance=true if a time of day is known. callsPerDay is optional ("over a thousand" -> 1000).',
+    rule: 'Map what they describe onto callTypes ("prior auths" -> priorAuth, "claims", "denials" -> claims, "insurance verification" -> benefits, "phones ringing off the hook / routing" -> switchboard). Also capture when it hurts most and call volume if mentioned. advance=true if at least one call type.',
   },
   warmth: {
     fields: {
@@ -46,13 +40,10 @@ const STEP_FIELDS: Record<string, { fields: Record<string, unknown>; rule: strin
       humanRule: { type: 'string', description: 'When a patient must be offered a human, under 12 words, e.g. "Anxious about biopsy results"' },
       humanTrigger: { type: 'string', description: 'The same rule as a second-person clause that completes "And if ___, I\'ll get you to someone on our team right away", e.g. "you\'re worried about a biopsy result"' },
       toneNotes: { type: 'string', description: 'Tone guidance for the agents, under 8 words' },
+      languages: { type: 'array', items: { type: 'string', enum: ['English', 'Spanish', 'Other'] }, description: 'Languages needed; default ["English"]' },
     },
-    rule: 'Always advance=true. Fill all four fields, inferring sensible values from whatever they said.',
-    required: ['greetingStyle', 'humanRule', 'humanTrigger', 'toneNotes'],
-  },
-  languages: {
-    fields: { languages: { type: 'array', items: { type: 'string', enum: ['English', 'Spanish', 'Other'] } } },
-    rule: 'Always advance=true. Default to English if unclear.',
+    rule: 'Always advance=true. Fill every field, inferring sensible values from whatever they said.',
+    required: ['greetingStyle', 'humanRule', 'humanTrigger', 'toneNotes', 'languages'],
   },
   tour: {
     fields: {},

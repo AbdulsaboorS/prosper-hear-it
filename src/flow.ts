@@ -1,65 +1,47 @@
 import {
-  CALL_TYPES, EHRS, type CallType, type Ehr, type Language, type PainTime, type Profile,
+  CALL_TYPES, type CallType, type Ehr, type Language, type PainTime, type Profile,
 } from './data'
 
-export type StepId =
-  | 'intro' | 'calls' | 'ehr' | 'volume' | 'warmth' | 'languages' | 'tour' | 'book' | 'confirm' | 'done'
+export type StepId = 'intro' | 'calls' | 'warmth' | 'tour' | 'book' | 'confirm' | 'done'
 
 export type View = 'setup' | 'team' | 'greeting' | 'book'
 
 export interface Step {
   id: StepId
   view: View
-  // Index into the six onboarding questions, for the progress bar.
+  // Which of the four questions this is, for the progress bar.
   question?: number
   ask: (p: Profile) => string
   quickReplies?: string[]
   multi?: boolean
 }
 
-const first = (p: Profile) => (p.name ? `, ${p.name}` : '')
+export const QUESTION_COUNT = 4
 
 export const STEPS: Step[] = [
   {
     id: 'intro', view: 'setup', question: 1,
     ask: () =>
-      "Hi, I'm your Prosper Guide. In about three minutes I'll set up an AI front desk team for your practice, just by talking. To start, what's your name, and tell me about your practice and specialty?",
+      "Hi, I'm Prosper Guide. Instead of a demo form, let's just talk, and I'll set up your AI front desk as we go. What's your name, and tell me about your practice: the specialty, how many providers, and which EHR you run?",
+    quickReplies: ['Dermatology, 12 providers, on ModMed', 'OB-GYN, 8 providers, on eClinicalWorks', 'GI, 20 providers, on athenahealth'],
   },
   {
     id: 'calls', view: 'setup', question: 2, multi: true,
-    ask: () => 'Which calls eat up most of your front desk\'s day? Scheduling, billing, benefits, prior auth, reminders, the switchboard, claims? Name as many as you like.',
-    quickReplies: CALL_TYPES.map((c) => c.label),
+    ask: () => "Which calls eat up your front desk's day, and when do the phones hurt the most?",
+    quickReplies: [...CALL_TYPES.map((c) => c.label), 'Mornings', 'After hours', 'All day'],
   },
   {
-    id: 'ehr', view: 'setup', question: 3,
-    ask: () => 'Which EHR do you run? Prosper reads and writes to it directly, so nobody re-types anything.',
-    quickReplies: [...EHRS],
-  },
-  {
-    id: 'volume', view: 'setup', question: 4,
-    ask: () => 'When do the phones hurt the most, and roughly how many calls do you get a day?',
-    quickReplies: ['Mornings', 'Lunch', 'After hours', 'All day'],
-  },
-  {
-    id: 'warmth', view: 'setup', question: 5,
+    id: 'warmth', view: 'setup', question: 3,
     ask: (p) =>
-      `This one matters most to me${first(p)}. How does your front desk make patients feel welcome, and when should a patient always be offered a real person?`,
-    quickReplies: ['Greet by name, never rush them. Anyone upset gets a human.'],
-  },
-  {
-    id: 'languages', view: 'setup', question: 6,
-    ask: () => 'Last one. Which languages do your patients need?',
-    quickReplies: ['English', 'English and Spanish', 'English, Spanish and others'],
+      `Last one${p.name ? `, ${p.name}` : ''}, and it matters most to me. How does your front desk make patients feel welcome, and when should a patient always get a real person? Mention any languages you need, too.`,
+    quickReplies: ['Greet by name, never rush them. Anyone upset gets a human. English and Spanish.'],
   },
   {
     id: 'tour', view: 'team',
     ask: () => '',
     quickReplies: ['Play a sample call', 'No thanks, keep going'],
   },
-  {
-    id: 'book', view: 'book',
-    ask: () => '',
-  },
+  { id: 'book', view: 'book', question: 4, ask: () => '' },
   {
     id: 'confirm', view: 'book',
     ask: () => 'Everything look right? Want me to send it to our team?',
@@ -192,16 +174,10 @@ const ACKS = {
     `${labels}. That's a lot of phone time, and every one of those has an agent built for it. Watch them join your team.`,
     `Okay, ${labels}. I'm adding the right agents for each of those now.`,
   ],
-  ehr: (ehr: string) => [`${ehr}, perfect. That's a well-worn path for us.`, `Great, ${ehr}. Your agents will read and write to it directly.`],
-  volume: (when: string, n?: number) => [
-    `${when}${n ? `, around ${n.toLocaleString()} calls a day` : ''}. That's exactly when patients end up on hold, so that's where your agents will start.`,
-    `Got it, ${when} is the crunch${n ? ` with about ${n.toLocaleString()} calls a day` : ''}. No more hold music during that window.`,
-  ],
   warmth: () => [
     "I love that. I've written that into how every one of your agents talks, and the rule about a real person is locked in.",
     "That's the heart of it. Your agents will greet patients that way, and they'll always know when to hand off to your team.",
   ],
-  languages: (langs: string) => [`${langs}, done.`, `Perfect, ${langs}.`],
 }
 
 function joinList(xs: string[]) {
@@ -217,34 +193,20 @@ export function localTurn(step: StepId, raw: string, profile: Profile): TurnResu
 
   switch (step) {
     case 'intro': {
-      const s = extractIntro(raw, t)
+      const s = { ...extractIntro(raw, t), ...(extractEhr(t) ? { ehr: extractEhr(t) } : {}) }
       if (!s.practice && !s.specialty) return result(s, "Sorry, I didn't catch your practice. What's it called, and what's your specialty?", false)
       return result(s, pick(ACKS.intro({ ...profile, ...s })))
     }
     case 'calls': {
       const callTypes = extractCallTypes(t)
-      if (!callTypes.length) return result({}, 'Which ones come up most? Scheduling, billing, benefits, prior auth, reminders, switchboard or claims?', false)
-      const labels = CALL_TYPES.filter((c) => callTypes.includes(c.id)).map((c) => c.label.toLowerCase())
-      return result({ callTypes }, pick(ACKS.calls(joinList(labels).replace(/^./, (c) => c.toUpperCase()))))
-    }
-    case 'ehr': {
-      const ehr = extractEhr(t)
-      if (!ehr) return result({}, 'Which one is it? athenahealth, ModMed, eClinicalWorks, Epic, NextGen, or something else?', false)
-      return result({ ehr }, pick(ACKS.ehr(ehr === 'Other' ? 'Okay' : ehr)))
-    }
-    case 'volume': {
       const painTimes = extractPain(t)
       const callsPerDay = extractNumber(t, /(\d[\d,]*|[a-z]+(?:[\s-][a-z]+){0,2})\s+calls/)
-      if (!painTimes.length) return result({ callsPerDay }, 'And when is it worst? Mornings, lunch, after hours, or all day?', false)
-      const when = joinList(painTimes).replace(/^./, (c) => c.toUpperCase())
-      return result({ painTimes, callsPerDay }, pick(ACKS.volume(when, callsPerDay)))
+      if (!callTypes.length) return result({ painTimes, callsPerDay }, 'Which ones come up most? Scheduling, billing, benefits, prior auth, reminders, switchboard or claims?', false)
+      const labels = CALL_TYPES.filter((c) => callTypes.includes(c.id)).map((c) => c.label.toLowerCase())
+      return result({ callTypes, painTimes, callsPerDay }, pick(ACKS.calls(joinList(labels).replace(/^./, (c) => c.toUpperCase()))))
     }
     case 'warmth':
-      return result(extractWarmth(raw), pick(ACKS.warmth()))
-    case 'languages': {
-      const languages = extractLanguages(t)
-      return result({ languages }, pick(ACKS.languages(joinList(languages))))
-    }
+      return result({ ...extractWarmth(raw), languages: extractLanguages(t) }, pick(ACKS.warmth()))
     case 'tour': {
       const agent = ['anna', 'emma', 'kate', 'alex', 'ben', 'tom', 'jack', 'mary', 'lucy', 'sara', 'james'].find((a) => t.includes(a))
       const yes = /\b(yes|yeah|sure|play|hear|ok|okay|go ahead)\b/.test(t) && !/\bno\b/.test(t)

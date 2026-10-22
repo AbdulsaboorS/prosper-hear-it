@@ -36,20 +36,23 @@ Deploy: `npm run deploy` (Cloudflare Pages).
 
 ### The flow
 
-1. Name, practice, specialty
-2. Which calls eat the front desk's day (multi-select)
-3. EHR
-4. When calls hurt most, and calls per day
-5. **Warmth:** how the front desk welcomes patients, and when a patient must always be offered a human
-6. Languages
+The left pane is a call, not a chat: a voice orb, a call timer, and live captions. The full transcript and typed input are one click away. The right pane is read-only and labeled *Built live by Prosper Guide*, so it reads as the agent's output, not a form to fill in.
 
-Then the guide:
+Four questions, each answered in one natural sentence. The model pulls several facts out of each answer:
 
-- switches to **Your AI team**, introduces each agent, and offers a sample call;
-- switches to **Your agent**, which shows the configured team, the 3-week path to live, and Anna's greeting using the practice name and warmth rules (with a **Cold / Warm** toggle and **Hear your agent**);
-- switches to **Kickoff**, fills in the "talk to our team" form from the conversation, asks for email and role, and sends it (mock) after you confirm. Finally, it links to Prosper's real Get Started page and offers the setup brief to copy.
+1. Name, practice, specialty, size, EHR
+2. Which calls eat the front desk's day, when it hurts most, and call volume
+3. **Warmth:** how the front desk welcomes patients, when a patient must always be offered a human, and languages
+4. Email and role (asked at the kickoff step)
 
-Three presets (Dermatology, OBGYN, GI) run the same flow automatically at natural pace. **Skip ahead** cuts the current line.
+In between, the guide drives the right pane:
+
+- **Your AI team:** introduces each agent while highlighting it, and offers a sample call.
+- **Your agent:** Anna greets a patient using the practice name and warmth rules. A **Cold / Warm** toggle and **Hear your agent** sit next to the greeting, with the 3-week path to live below.
+- **Kickoff:** fills in the "talk to our team" request field by field, then sends it (mock) once you confirm.
+- **Done screen:** the **lead brief Prosper's sales team receives** (fit signals, contact, agents to deploy, warmth rules, a suggested demo opener, and how long it took to capture by voice), plus a link to Prosper's real Get Started page.
+
+Three presets (Dermatology, OBGYN, GI) run the same call automatically. **Skip ahead** cuts the current line.
 
 ## Agent mapping
 
@@ -69,30 +72,26 @@ Three presets (Dermatology, OBGYN, GI) run the same flow automatically at natura
 
 Agent names and roles are taken from getprosper.ai/use-cases. Payer-side agents are left out because this onboards a provider practice. Sample call scripts are illustrative.
 
-## Loom script (about 2 minutes)
+## Loom script (about 90 seconds)
 
-**0:00–0:20 · Cold open.** Show Xavier's Oct 21 post about people fearing AI brings distance and coldness, and about customers still coming to the ModMed booth for human connection.
-> "Xavier's right. So I looked at how a practice first meets Prosper today."
+**0:00–0:15 · Today's first touch.** On getprosper.ai, go to Use Cases → Meet Your AI Voice Agent Team. Point at Anna's Recording link at the bottom of her expanded card; she's the only one with a recording. Everything else is Get Started or a phone number.
+> "Prosper sells voice agents, but a practice's first touch is a form."
 
-**0:20–0:40 · The buried demo.** Open getprosper.ai → Use Cases → Meet Your AI Voice Agent Team. Scroll the agents. Expand Anna and point at the Recording link at the bottom. Then show that everything else is Get Started or a phone number.
-> "The product is a voice agent, but the first touch is a form."
+**0:15–1:05 · What I'd build if I worked at Prosper.** Open the onboarder and click **Start a call**. Answer the four questions out loud in one breath each, and cut the pauses in editing:
+- "I'm Abdul, I run ops at Bayview Dermatology. Twelve providers, on ModMed."
+- "Prior auths and scheduling are killing us, plus benefits checks. After hours is worst, maybe 600 calls a day."
+- "We greet everyone by name. Anyone anxious about a biopsy result always gets a person. English and Spanish."
+- At the team step: "No thanks." Or "play Kate" if you have time for the sample call.
 
-**0:40–1:35 · Talk to it.** Open the onboarder and click **Talk to Prosper Guide**. Answer out loud, naturally:
-- "I'm Abdul, I run ops at Bayview Dermatology, twelve providers."
-- "Prior auths and scheduling are killing us, and benefits checks."
-- "ModMed." · "After hours, maybe 600 calls a day."
-- Warmth: "We greet people by name, and anyone anxious about a biopsy result always gets a human."
-- "English and Spanish." · "Sure, play Kate."
+Point at the right pane building itself as you talk.
 
-Point at the right pane as it fills in, as agents join the team, and as Kate takes a call. (Use **Skip ahead** on the sample call if you're short on time.)
-
-**1:35–1:50 · The punchline.** On *Your agent*, let Anna's warm greeting play. Flip to **Cold** and press **Hear your agent**. Flip back to **Warm**.
+**1:05–1:20 · The punchline.** Anna greets your patient. Flip to **Cold**, press **Hear your agent**, then flip back to **Warm**.
 > "Same agent. One sounds like a phone tree, one sounds like your front desk."
 
-**1:50–2:00 · Booked.** Say your email and role, watch the kickoff form fill itself, and say "yes, send it."
-> "In my first two weeks I'd want to put the product in front of practices from the very first click, then measure how many demo requests become kickoffs. I'd love to help build that at Prosper."
+**1:20–1:30 · Booked.** Give your email and role, then say "yes, send it." The lead brief appears.
+> "The prospect has felt the product, and sales gets the EHR, call volume, warmth rules and a demo opener before the first call. That's what I'd ship."
 
-*If the mic acts up during recording, click a preset (Dermatology is the best one). It runs the same flow on its own.*
+*If the mic acts up during recording, click a preset (Dermatology is the best one). It runs the same call on its own.*
 
 ## Project layout
 

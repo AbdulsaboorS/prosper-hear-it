@@ -1,5 +1,5 @@
 import { AGENTS, CALL_TYPES, greetingScript, teamFor, type AgentId, type Profile, type SampleLine } from './data'
-import { STEPS, stepIndex, type StepId, type View } from './flow'
+import { QUESTION_COUNT, STEPS, stepIndex, type StepId, type View } from './flow'
 
 export type BookField = 'name' | 'practice' | 'specialty' | 'providers' | 'ehr' | 'volume' | 'team' | 'warmth'
 
@@ -17,6 +17,7 @@ interface Props {
   submitted: boolean
   onRestart: () => void
   onEditField: (patch: Partial<Profile>) => void
+  callSeconds: number
 }
 
 const TABS: { id: View; label: string }[] = [
@@ -28,8 +29,10 @@ const TABS: { id: View; label: string }[] = [
 
 export function RightPane(props: Props) {
   const { profile, step, view } = props
-  const question = Math.min(STEPS.find((s) => s.id === step)?.question ?? 6, 6)
-  const pastQuestions = stepIndex(step) >= stepIndex('tour')
+  const question = STEPS.find((s) => s.id === step)?.question
+  const label = props.submitted ? 'Onboarding complete'
+    : question ? `Question ${question} of ${QUESTION_COUNT}`
+    : stepIndex(step) > stepIndex('book') ? `Question ${QUESTION_COUNT} of ${QUESTION_COUNT}` : 'Meet your team'
   const pct = configured(profile, props.submitted)
 
   return (
@@ -37,7 +40,7 @@ export function RightPane(props: Props) {
       <div className="pane-top">
         <div className="progress">
           <div className="progress-label">
-            <span>{pastQuestions ? 'Onboarding complete' : `Step ${question} of 6`}</span>
+            <span><span className="built">Built live by Prosper Guide</span> · {label}</span>
             <strong>{pct}% configured</strong>
           </div>
           <div className="bar"><div style={{ width: `${pct}%` }} /></div>
@@ -247,6 +250,7 @@ function BookView(props: Props) {
           <p>An Agent Manager will reach out to {p.email ?? 'you'} within a business day to start Week 1.</p>
           <p className="muted small">Prototype: nothing was actually sent.</p>
         </div>
+        <SalesBrief profile={p} seconds={props.callSeconds} />
         <GoLive />
         <div className="actions">
           <a className="primary" href="https://www.getprosper.ai/get-started" target="_blank" rel="noreferrer">Open Prosper's real Get Started →</a>
@@ -285,6 +289,50 @@ function BookView(props: Props) {
         {row('team', 'Agents needed', team.map((id) => AGENTS[id].name).join(', '))}
         {row('warmth', 'Human handoff rule', p.humanRule)}
       </div>
+    </div>
+  )
+}
+
+function SalesBrief({ profile: p, seconds }: { profile: Profile; seconds: number }) {
+  const team = teamFor(p.callTypes)
+  const lead = (['kate', 'alex', 'anna', 'lucy', 'emma'] as AgentId[]).find((a) => team.includes(a)) ?? team[0]
+  const pain = p.painTimes.includes('after hours') ? ', then show after-hours coverage'
+    : p.painTimes.includes('mornings') ? ', then show how the morning rush gets absorbed'
+    : p.painTimes.includes('all day') && p.callsPerDay ? `, then show capacity at ${p.callsPerDay.toLocaleString()} calls a day`
+    : ''
+  const signals = [
+    p.specialty,
+    p.providers && `${p.providers} providers`,
+    p.ehr,
+    p.callsPerDay && `${p.callsPerDay.toLocaleString()} calls/day`,
+    p.painTimes.length > 0 && `Peak: ${p.painTimes.join(', ')}`,
+    p.languages.length > 1 && p.languages.join(' + '),
+  ].filter(Boolean) as string[]
+
+  return (
+    <div className="sales-brief">
+      <div className="brief-head">
+        <div>
+          <div className="eyebrow">What Prosper's sales team receives</div>
+          <h3>{p.practice ?? 'New practice'} · lead brief</h3>
+        </div>
+        <span className="captured">Captured by voice in {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}. No form.</span>
+      </div>
+      <div className="signals">{signals.map((s) => <span key={s}>{s}</span>)}</div>
+      <dl>
+        <dt>Contact</dt>
+        <dd>{[p.name, p.role].filter(Boolean).join(', ')}{p.email ? ` · ${p.email}` : ''}</dd>
+        <dt>Agents to deploy</dt>
+        <dd>{team.map((id) => `${AGENTS[id].name} (${AGENTS[id].role})`).join(', ')}</dd>
+        <dt>Warmth rules</dt>
+        <dd>{[p.greetingStyle, p.humanRule && `Human handoff: ${p.humanRule.replace(/\.$/, '')}`].filter(Boolean).join('. ')}</dd>
+        {lead && (
+          <>
+            <dt>Suggested demo opener</dt>
+            <dd>Open with {AGENTS[lead].name} on {AGENTS[lead].role.toLowerCase()}{pain}.</dd>
+          </>
+        )}
+      </dl>
     </div>
   )
 }

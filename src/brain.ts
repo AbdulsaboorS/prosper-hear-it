@@ -44,7 +44,7 @@ function clean(slots: Partial<Profile>): Partial<Profile> {
   }
   const trigger = out.humanTrigger as string | undefined
   if (trigger && !/^(you|your)\b/i.test(trigger)) out.humanTrigger = `you're ${trigger}`
-  for (const k of ['humanRule', 'specialty']) {
+  for (const k of ['humanRule', 'specialty', 'greetingStyle', 'toneNotes']) {
     if (typeof out[k] === 'string') out[k] = (out[k] as string).replace(/^./, (c) => c.toUpperCase())
   }
   if (typeof out.role === 'string') out.role = (out.role as string).replace(/\b(?!of\b|and\b)\w/g, (c) => c.toUpperCase())

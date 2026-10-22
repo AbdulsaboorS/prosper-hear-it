@@ -48,6 +48,9 @@ export default function App() {
   const [submitted, setSubmitted] = useState(false)
   const [, setVoiceTick] = useState(0)
   const [micError, setMicError] = useState('')
+  const [showTranscript, setShowTranscript] = useState(false)
+  const [callStart, setCallStart] = useState(0)
+  const [callSeconds, setCallSeconds] = useState(0)
 
   const runRef = useRef(0)
   const profileRef = useRef(profile)
@@ -71,7 +74,14 @@ export default function App() {
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, interim])
+  }, [messages, interim, showTranscript])
+
+  // Call timer; freezes once the kickoff is sent.
+  useEffect(() => {
+    if (!started || submitted) return
+    const id = window.setInterval(() => setCallSeconds(Math.floor((Date.now() - callStart) / 1000)), 500)
+    return () => window.clearInterval(id)
+  }, [started, submitted, callStart])
 
   const setModeBoth = (m: Mode) => {
     modeRef.current = m
@@ -197,7 +207,7 @@ export default function App() {
   function prefetchAfter(step: StepId) {
     const p = profileRef.current
     const next = nextStep(step)
-    if (step === 'languages') {
+    if (step === 'warmth') {
       speaker.prefetch(teamIntro().lines)
     } else if (step === 'tour') {
       const { featured } = teamIntro()
@@ -314,6 +324,9 @@ export default function App() {
     setPicked([])
     presetRef.current = preset ? { preset, index: 0 } : null
     setModeBoth(m)
+    setShowTranscript(false)
+    setCallStart(Date.now())
+    setCallSeconds(0)
     setStarted(true)
     runConversation(run).catch((err) => {
       if (!(err instanceof Cancelled)) console.error(err)
@@ -378,6 +391,11 @@ export default function App() {
   const def = STEPS.find((s) => s.id === step)!
   const waiting = started && !speaking && !thinking && step !== 'done' && mode !== 'preset'
   const orbState = listening ? 'listening' : speaking ? 'speaking' : thinking ? 'thinking' : 'idle'
+  const statusText = listening ? 'Listening…' : speaking ? 'Speaking…' : thinking ? 'Thinking…'
+    : step === 'done' ? 'Kickoff sent' : mode === 'text' ? 'Your turn, type below' : mode === 'preset' ? '' : 'Your turn, just talk'
+  const lastGuide = [...messages].reverse().find((m) => m.who === 'guide')
+  const lastUser = messages.length && messages[messages.length - 1].who === 'user' ? messages[messages.length - 1].text : ''
+  const userCaption = interim || draft || lastUser
 
   return (
     <div className="app">
@@ -393,50 +411,45 @@ export default function App() {
             </p>
           </div>
         </div>
-        {started && (
-          <button className="ghost" onClick={restart}>Restart demo</button>
-        )}
       </header>
 
       <main className="main">
         <section className="guide card">
-          <div className="guide-top">
-            <div className={`orb orb-${orbState}`} aria-hidden>
-              <span /><span /><span />
-            </div>
-            <div>
-              <div className="eyebrow">Prosper Guide</div>
-              <div className="status">
-                {!started ? 'Your onboarding, by voice' :
-                  listening ? 'Listening…' : speaking ? 'Speaking…' : thinking ? 'Thinking…' :
-                  step === 'done' ? 'All set' : mode === 'preset' ? 'Running sample practice' : 'Your turn'}
-              </div>
-            </div>
-            {started && (speaking || mode === 'preset') && step !== 'done' && (
-              <button className="ghost small skip" onClick={skipAhead}>Skip ahead ›</button>
-            )}
-          </div>
-
           {!started ? (
-            <Welcome
-              onStart={start}
-              voiceStatus={speaker.status}
-              progress={speaker.progress}
-              onUseBrowserVoice={() => speaker.useFallback()}
-            />
+            <Welcome onStart={start} />
           ) : (
             <>
-              <div className="transcript" ref={transcriptRef}>
-                {messages.map((m) => (
-                  <div key={m.id} className={`bubble from-${m.who}`}>{m.text}</div>
-                ))}
-                {interim && <div className="bubble from-user interim">{interim}</div>}
-                {thinking && <div className="bubble from-guide typing"><i /><i /><i /></div>}
+              <div className="call-top">
+                <span className="eyebrow">{step === 'done' ? 'Call ended' : mode === 'preset' ? 'Sample call' : 'On a call'}</span>
+                <span className="timer">{formatTime(callSeconds)}</span>
+                <button className="link small" onClick={() => setShowTranscript((v) => !v)}>
+                  {showTranscript ? 'Hide transcript' : 'Show transcript'}
+                </button>
               </div>
+
+              {showTranscript ? (
+                <div className="transcript" ref={transcriptRef}>
+                  {messages.map((m) => (
+                    <div key={m.id} className={`bubble from-${m.who}`}>{m.text}</div>
+                  ))}
+                  {interim && <div className="bubble from-user interim">{interim}</div>}
+                </div>
+              ) : (
+                <div className="stage">
+                  <div className={`orb big-orb orb-${orbState}`} aria-hidden>
+                    <span /><span /><span />
+                  </div>
+                  <div className="who">Prosper Guide</div>
+                  <div className="status">{statusText}</div>
+                  <p className="caption" key={lastGuide?.id}>{lastGuide?.text}</p>
+                  {userCaption && <p className={`caption-user ${interim || draft ? 'live' : ''}`}>{userCaption}</p>}
+                  {thinking && <div className="typing"><i /><i /><i /></div>}
+                </div>
+              )}
 
               {micError && <div className="mic-error">{micError}</div>}
 
-              {waiting && def.quickReplies && (
+              {mode === 'text' && waiting && def.quickReplies && (
                 <div className="chips">
                   {def.quickReplies.map((q) => {
                     const on = picked.includes(q)
@@ -456,31 +469,42 @@ export default function App() {
                 </div>
               )}
 
-              <form
-                className="composer"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  submitReply(draft)
-                }}
-              >
+              {mode === 'text' && step !== 'done' && (
+                <form
+                  className="composer"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    submitReply(draft)
+                  }}
+                >
+                  <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Type your answer" autoFocus />
+                  <button type="submit" className="send" disabled={!draft.trim()}>Send</button>
+                </form>
+              )}
+
+              <div className="controls">
+                {mode === 'preset' ? (
+                  <span className="muted small">Sample practice, answering automatically</span>
+                ) : (
+                  <button className="link small" onClick={() => setModeBoth(mode === 'text' ? 'voice' : 'text')} disabled={step === 'done'}>
+                    {mode === 'text' ? 'Use voice' : 'Type instead'}
+                  </button>
+                )}
                 <button
-                  type="button"
                   className={`mic ${listening ? 'live' : ''}`}
                   onClick={onMic}
                   disabled={!canListen || step === 'done' || mode === 'preset'}
                   title={speaking ? 'Interrupt' : listening ? 'Done talking' : 'Talk'}
-                  aria-label="Microphone"
+                  aria-label={speaking ? 'Interrupt' : listening ? 'Done talking' : 'Talk'}
                 >
-                  <MicIcon />
+                  <MicIcon size={24} />
                 </button>
-                <input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder={listening ? 'Listening… or type here' : 'Type your answer'}
-                  disabled={mode === 'preset' || step === 'done'}
-                />
-                <button type="submit" className="send" disabled={!draft.trim() || mode === 'preset'}>Send</button>
-              </form>
+                {step !== 'done' && (speaking || mode === 'preset') ? (
+                  <button className="ghost small" onClick={skipAhead}>Skip ahead ›</button>
+                ) : (
+                  <button className="ghost small end" onClick={restart}>{step === 'done' ? 'Start over' : 'End call'}</button>
+                )}
+              </div>
             </>
           )}
         </section>
@@ -499,6 +523,7 @@ export default function App() {
           submitted={submitted}
           onRestart={restart}
           onEditField={(patch) => updateProfile(patch)}
+          callSeconds={callSeconds}
         />
       </main>
 
@@ -509,43 +534,25 @@ export default function App() {
   )
 }
 
-function Welcome(props: {
-  onStart: (m: Mode, preset?: Preset) => void
-  voiceStatus: string
-  progress: number
-  onUseBrowserVoice: () => void
-}) {
-  const loading = props.voiceStatus === 'loading'
+function Welcome({ onStart }: { onStart: (m: Mode, preset?: Preset) => void }) {
   return (
     <div className="welcome">
-      <h2>Set up your AI front desk in three minutes, just by talking.</h2>
+      <div className="orb big-orb orb-idle" aria-hidden><span /><span /><span /></div>
+      <h2>Skip the demo form. Talk to a Prosper agent for two minutes.</h2>
       <p className="lede">
-        Tell Prosper Guide about your practice. Watch your team of AI voice agents assemble on the right,
-        hear your own agent greet a patient, and leave with your kickoff booked.
+        It's the same technology that will answer your patients' calls. Tell it about your practice and it
+        builds your AI front desk while you talk: your agents, your warmth rules, your kickoff with our team.
       </p>
-      <button className="primary big" onClick={() => props.onStart(canListen ? 'voice' : 'text')}>
-        <MicIcon /> {canListen ? 'Talk to Prosper Guide' : 'Start onboarding'}
+      <button className="primary big" onClick={() => onStart(canListen ? 'voice' : 'text')}>
+        <PhoneIcon /> Start a call
       </button>
-      <button className="link" onClick={() => props.onStart('text')}>or type instead</button>
-
-      <div className="voice-status">
-        {loading ? (
-          <>
-            <div className="bar"><div style={{ width: `${Math.round(props.progress * 100)}%` }} /></div>
-            <span>Warming up a natural voice ({Math.round(props.progress * 100)}%) · runs in your browser</span>
-            <button className="link small" onClick={props.onUseBrowserVoice}>use browser voice</button>
-          </>
-        ) : props.voiceStatus === 'ready' ? (
-          <span>● Natural voice ready</span>
-        ) : (
-          <span>Using your browser's voice</span>
-        )}
-      </div>
+      <button className="link small" onClick={() => onStart('text')}>or type instead</button>
+      {!canListen && <p className="muted small">Voice input needs Chrome. Typing works everywhere.</p>}
 
       <div className="presets">
-        <div className="eyebrow">Or watch a sample practice</div>
+        <div className="eyebrow">Or listen to a sample call</div>
         {PRESETS.map((p) => (
-          <button key={p.id} className="preset" onClick={() => props.onStart('preset', p)}>
+          <button key={p.id} className="preset" onClick={() => onStart('preset', p)}>
             <strong>{p.label}</strong>
             <span>{p.detail}</span>
           </button>
@@ -555,9 +562,21 @@ function Welcome(props: {
   )
 }
 
-function MicIcon() {
+function formatTime(s: number) {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+function PhoneIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" />
+    </svg>
+  )
+}
+
+function MicIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
       <rect x="9" y="3" width="6" height="12" rx="3" />
       <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
     </svg>

@@ -73,6 +73,7 @@ export function teamFor(callTypes: CallType[]): AgentId[] {
   return [...new Set(ids)]
 }
 
+// One scripted reply per turn, in flow order (see STEPS in flow.ts).
 export interface Preset {
   id: string
   label: string
@@ -80,21 +81,17 @@ export interface Preset {
   lines: string[]
 }
 
-// One scripted reply per question, in flow order (see STEPS in flow.ts).
 export const PRESETS: Preset[] = [
   {
     id: 'derm',
     label: 'Dermatology group',
     detail: '12 providers · ModMed · after-hours pain',
     lines: [
-      "Hi, I'm Priya, I run operations at Lakeside Dermatology. We're a dermatology group with 12 providers.",
-      'Honestly scheduling, benefits verification and prior auth. Prior auths for biologics are killing us.',
-      'We run ModMed.',
-      'After hours is the worst. Probably around 600 calls a day.',
-      "Our front desk always greets people by name and tells them we're glad they called. If someone's anxious about a biopsy result, they should always get a human.",
-      'English and Spanish.',
+      "Hi, I'm Priya, I run operations at Lakeside Dermatology. We have 12 providers and we're on ModMed.",
+      'Scheduling, benefits checks and prior auths. Prior auths for biologics are killing us, and after hours is the worst. Around 600 calls a day.',
+      "We greet everyone by name and tell them we're glad they called. Anyone anxious about a biopsy result should always get a human. English and Spanish.",
       'Sure, play Kate.',
-      'priya@lakesidederm.com, I\'m the director of operations.',
+      "priya@lakesidederm.com, I'm the director of operations.",
       'Yes, send it.',
     ],
   },
@@ -103,12 +100,9 @@ export const PRESETS: Preset[] = [
     label: 'OBGYN group',
     detail: '8 providers · eClinicalWorks · morning pain',
     lines: [
-      "This is Dana, practice manager at Harbor Women's Health, an OB-GYN group with 8 providers.",
-      'Mostly scheduling and billing questions.',
-      'eClinicalWorks.',
-      'Mornings, right when we open. About 400 calls a day.',
-      "We're warm and unhurried, a lot of our patients are expecting for the first time. Anyone mentioning bleeding or pain goes to a nurse immediately.",
-      'English and Spanish.',
+      "This is Dana, practice manager at Harbor Women's Health. We're an OB-GYN group, 8 providers, on eClinicalWorks.",
+      'Mostly scheduling and billing questions. Mornings are brutal, about 400 calls a day.',
+      "Warm and unhurried, a lot of our patients are expecting for the first time. Anyone mentioning bleeding or pain goes to a nurse immediately. English and Spanish.",
       'Yes, let me hear Anna.',
       "dana@harborwomens.com, I'm the practice manager.",
       'Yes please.',
@@ -119,12 +113,9 @@ export const PRESETS: Preset[] = [
     label: 'GI practice',
     detail: '20 providers · athenahealth · all-day pain',
     lines: [
-      "I'm Marcus, COO of Summit Gastroenterology. It's a GI practice, 20 providers.",
-      'Scheduling, prior authorizations, and claims follow-up.',
-      'athenahealth.',
-      "It's all day, honestly. Over a thousand calls a day.",
-      'We keep it calm and clear, a lot of people are nervous about colonoscopy prep. Anyone confused about prep instructions should always be offered a person.',
-      'Just English.',
+      "I'm Marcus, COO of Summit Gastroenterology. 20 providers, and we run athenahealth.",
+      "Scheduling, prior authorizations, and claims follow-up. It's all day, honestly, over a thousand calls a day.",
+      'Calm and clear, a lot of people are nervous about colonoscopy prep. Anyone confused about prep instructions should always be offered a person. Just English.',
       'No, I think I get it.',
       "marcus@summitgi.com, I'm the COO.",
       'Go ahead and send it.',
