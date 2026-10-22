@@ -1,5 +1,5 @@
 import {
-  CALL_TYPES, type CallType, type Ehr, type Language, type PainTime, type Profile,
+  AGENTS, CALL_TYPES, teamFor, type CallType, type Ehr, type Language, type PainTime, type Profile,
 } from './data'
 
 export type StepId = 'intro' | 'calls' | 'warmth' | 'tour' | 'book' | 'confirm' | 'done'
@@ -22,7 +22,7 @@ export const STEPS: Step[] = [
   {
     id: 'intro', view: 'setup', question: 1,
     ask: () =>
-      "Hi, I'm Prosper Guide. Instead of a demo form, let's just talk, and I'll set up your AI front desk as we go. What's your name, and tell me about your practice: the specialty, how many providers, and which EHR you run?",
+      "Hi, I'm Prosper Guide. Let's set up your AI front desk in under a minute. What's your name, and tell me about your practice: specialty, size, and EHR?",
     quickReplies: ['Dermatology, 12 providers, on ModMed', 'OB-GYN, 8 providers, on eClinicalWorks', 'GI, 20 providers, on athenahealth'],
   },
   {
@@ -33,7 +33,7 @@ export const STEPS: Step[] = [
   {
     id: 'warmth', view: 'setup', question: 3,
     ask: (p) =>
-      `Last one${p.name ? `, ${p.name}` : ''}, and it matters most to me. How does your front desk make patients feel welcome, and when should a patient always get a real person? Mention any languages you need, too.`,
+      `Last one${p.name ? `, ${p.name}` : ''}, and it matters most. How does your front desk make patients feel welcome, and when should they always get a real person? Any languages, too.`,
     quickReplies: ['Greet by name, never rush them. Anyone upset gets a human. English and Spanish.'],
   },
   {
@@ -44,7 +44,7 @@ export const STEPS: Step[] = [
   { id: 'book', view: 'book', question: 4, ask: () => '' },
   {
     id: 'confirm', view: 'book',
-    ask: () => 'Everything look right? Want me to send it to our team?',
+    ask: () => 'Want me to send it to our team?',
     quickReplies: ['Yes, send it', 'Not yet'],
   },
   { id: 'done', view: 'book', ask: () => '' },
@@ -55,15 +55,16 @@ export const nextStep = (id: StepId): StepId => STEPS[Math.min(stepIndex(id) + 1
 
 // What the brain hands back for one user turn. The LLM fills this in;
 // `localTurn` below is the keyword fallback with the same shape.
+// Result of understanding one reply. `localTurn` produces it instantly from keywords;
+// the model (src/brain.ts) produces the same shape in the background.
 export interface TurnResult {
   slots: Partial<Profile>
-  ack: string
   advance: boolean
+  // What to ask when the step isn't complete yet.
+  clarify?: string
   playSample?: string
-  source: 'llm' | 'local'
 }
 
-const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)]
 
 const has = (t: string, ...words: string[]) => words.some((w) => t.includes(w))
 
@@ -139,7 +140,7 @@ const SPECIALTIES: [RegExp, string][] = [
 
 function extractIntro(raw: string, t: string): Partial<Profile> {
   const out: Partial<Profile> = {}
-  const name = raw.match(/(?:I'?m|I am|my name is|this is|it's)\s+([A-Z][a-z]+)/)
+  const name = raw.match(/(?:I'?m|I am|my name is|this is)\s+([A-Z][a-z]+)/)
   if (name) out.name = name[1]
   const practice =
     raw.match(/(?:at|from|run|called|of|we're|we are)\s+((?:[A-Z][\w'&.-]*\s?){1,4}(?:Dermatology|Health|Medical|Medicine|Clinic|Associates|Group|Gastroenterology|Pediatrics|Orthopedics|Care|Partners|Practice|Center|Women's Health|GI|OB-GYN|OBGYN))/) ??
@@ -165,67 +166,85 @@ function extractWarmth(raw: string): Partial<Profile> {
   }
 }
 
-const ACKS = {
-  intro: (p: Partial<Profile>) => [
-    `Lovely to meet you${p.name ? `, ${p.name}` : ''}. ${p.practice ?? 'Your practice'}${p.specialty ? `, ${p.specialty.toLowerCase()}` : ''}${p.providers ? ` with ${p.providers} providers` : ''}. Got it.`,
-    `Thanks${p.name ? `, ${p.name}` : ''}. So that's ${p.practice ?? 'your practice'}${p.providers ? `, ${p.providers} providers` : ''}. I've started your practice card on the right.`,
-  ],
-  calls: (labels: string) => [
-    `${labels}. That's a lot of phone time, and every one of those has an agent built for it. Watch them join your team.`,
-    `Okay, ${labels}. I'm adding the right agents for each of those now.`,
-  ],
-  warmth: () => [
-    "I love that. I've written that into how every one of your agents talks, and the rule about a real person is locked in.",
-    "That's the heart of it. Your agents will greet patients that way, and they'll always know when to hand off to your team.",
-  ],
+// Deterministic variety, so the line can be fetched before the user finishes talking.
+const vary = (p: Profile, lines: string[]) => lines[(p.name?.length ?? 0) % lines.length]
+
+const lowerSpecialty = (s: string) => (/^[A-Z]{2,}|-/.test(s) ? s : s.toLowerCase())
+
+// Spoken acknowledgements are built from the profile, and only from details that survive
+// speech recognition well (specialty, size, EHR, call types), never the practice name.
+export function ackFor(step: StepId, p: Profile): string {
+  const you = p.name ? `, ${p.name}` : ''
+  switch (step) {
+    case 'intro': {
+      const size = p.providers ? `${p.providers}-provider ` : ''
+      const spec = p.specialty ? `${lowerSpecialty(p.specialty)} ` : ''
+      const ehr = p.ehr && p.ehr !== 'Other' ? ` on ${p.ehr}` : ''
+      const desc = size || spec || ehr ? `A ${size}${spec}practice${ehr}` : 'Your practice'
+      return vary(p, [`Great to meet you${you}. ${desc}, got it.`, `Thanks${you}. ${desc}, perfect.`])
+    }
+    case 'calls': {
+      const labels = CALL_TYPES.filter((c) => p.callTypes.includes(c.id)).map((c) => c.label.toLowerCase())
+      const worst = p.painTimes.length ? `, worst ${joinList(p.painTimes)}` : ''
+      const names = teamFor(p.callTypes).map((id) => AGENTS[id].name)
+      const joining = names.length === 1 ? `${names[0]} is joining your team.` : `${joinList(names)} are joining your team.`
+      return `${capitalize(joinList(labels))}${worst}. ${joining}`
+    }
+    case 'warmth':
+      return vary(p, [
+        "I love that. It's written into how every agent talks, and the human handoff rule is locked in.",
+        "That's the heart of it. Every agent will greet patients that way and know when to hand off.",
+      ])
+    case 'book':
+      return 'Thank you.'
+    default:
+      return ''
+  }
 }
+
+const capitalize = (s: string) => s.replace(/^./, (c) => c.toUpperCase())
 
 function joinList(xs: string[]) {
   if (xs.length <= 1) return xs.join('')
   return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
 }
 
-export function localTurn(step: StepId, raw: string, profile: Profile): TurnResult {
+export function localTurn(step: StepId, raw: string): TurnResult {
   const t = raw.toLowerCase()
-  const result = (slots: Partial<Profile>, ack: string, advance = true): TurnResult => ({
-    slots, ack, advance, source: 'local',
-  })
+  const result = (slots: Partial<Profile>, advance = true, clarify?: string): TurnResult => ({ slots, advance, clarify })
 
   switch (step) {
     case 'intro': {
       const s = { ...extractIntro(raw, t), ...(extractEhr(t) ? { ehr: extractEhr(t) } : {}) }
-      if (!s.practice && !s.specialty) return result(s, "Sorry, I didn't catch your practice. What's it called, and what's your specialty?", false)
-      return result(s, pick(ACKS.intro({ ...profile, ...s })))
+      return s.practice || s.specialty ? result(s) : result(s, false, "Sorry, I didn't catch your practice. What's it called, and what's your specialty?")
     }
     case 'calls': {
       const callTypes = extractCallTypes(t)
       const painTimes = extractPain(t)
       const callsPerDay = extractNumber(t, /(\d[\d,]*|[a-z]+(?:[\s-][a-z]+){0,2})\s+calls/)
-      if (!callTypes.length) return result({ painTimes, callsPerDay }, 'Which ones come up most? Scheduling, billing, benefits, prior auth, reminders, switchboard or claims?', false)
-      const labels = CALL_TYPES.filter((c) => callTypes.includes(c.id)).map((c) => c.label.toLowerCase())
-      return result({ callTypes, painTimes, callsPerDay }, pick(ACKS.calls(joinList(labels).replace(/^./, (c) => c.toUpperCase()))))
+      const slots = { callTypes, painTimes, callsPerDay }
+      return callTypes.length ? result(slots) : result(slots, false, 'Which ones come up most? Scheduling, billing, benefits, prior auth, reminders or claims?')
     }
     case 'warmth':
-      return result({ ...extractWarmth(raw), languages: extractLanguages(t) }, pick(ACKS.warmth()))
+      return result({ ...extractWarmth(raw), languages: extractLanguages(t) })
     case 'tour': {
-      const agent = ['anna', 'emma', 'kate', 'alex', 'ben', 'tom', 'jack', 'mary', 'lucy', 'sara', 'james'].find((a) => t.includes(a))
+      const agent = Object.keys(AGENTS).find((a) => t.includes(a))
       const yes = /\b(yes|yeah|sure|play|hear|ok|okay|go ahead)\b/.test(t) && !/\bno\b/.test(t)
-      return { slots: {}, ack: '', advance: true, playSample: agent ?? (yes ? 'auto' : undefined), source: 'local' }
+      return { slots: {}, advance: true, playSample: agent ?? (yes ? 'auto' : undefined) }
     }
     case 'book': {
       const email = raw.replace(/\s+at\s+/i, '@').replace(/\s+dot\s+/gi, '.').match(/[\w.+-]+@[\w-]+\.[\w.]+/)
       const role = raw.match(/(?:I'?m|I am)\s+(?:the\s+|a\s+|an\s+)?([a-zA-Z ]+?)(?:[.,]|$)/)
       const slots: Partial<Profile> = {}
       if (email) slots.email = email[0].toLowerCase().replace(/\.$/, '')
-      if (role) slots.role = role[1].trim().replace(/^./, (c) => c.toUpperCase())
-      if (!slots.email) return result(slots, "Sorry, what's the best email for you?", false)
-      return result(slots, 'Thank you. Your kickoff request is filled in on the right.')
+      if (role) slots.role = capitalize(role[1].trim())
+      return slots.email ? result(slots) : result(slots, false, "Sorry, what's the best email for you?")
     }
     case 'confirm': {
       const yes = /\b(yes|yeah|sure|send|go ahead|please|do it)\b/.test(t) && !/\b(no|not yet|wait)\b/.test(t)
-      return yes ? result({}, '') : result({}, "No problem. Edit anything on the right, and tell me when it's ready.", false)
+      return yes ? result({}) : result({}, false, "No problem. Edit anything on the right, and tell me when it's ready.")
     }
     default:
-      return result({}, '')
+      return result({})
   }
 }

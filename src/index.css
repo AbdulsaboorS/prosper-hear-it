@@ -272,3 +272,11 @@ blockquote.cold { background: #eef0f2; color: #5b6670; font-family: 'SF Mono', u
 .sales-brief dt { color: #9fb7c6; font-weight: 600; }
 .sales-brief dd { margin: 0; }
 @media (max-width: 860px) { .sales-brief dl { grid-template-columns: 1fr; } }
+
+/* ?debug latency panel */
+.debug { position: fixed; right: 16px; bottom: 16px; z-index: 10; background: rgba(20, 20, 20, 0.92); color: #eee; font: 12px/1.4 ui-monospace, Menlo, monospace; padding: 12px 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.debug table { border-collapse: collapse; }
+.debug th, .debug td { text-align: left; padding: 2px 10px 2px 0; font-weight: 400; }
+.debug th { color: #999; }
+.debug .slow { color: #ffb59f; }
+.debug span { color: #999; }

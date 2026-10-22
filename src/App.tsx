@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { understand } from './brain'
+import { refine } from './brain'
 import {
   AGENTS, PRESETS, emptyProfile, greetingScript, sampleCall, teamFor,
   type AgentId, type Preset, type Profile, type SampleLine,
 } from './data'
-import { STEPS, nextStep, type StepId, type View } from './flow'
+import { STEPS, ackFor, localTurn, nextStep, type StepId, type View } from './flow'
 import { RightPane, type BookField } from './RightPane'
-import { Listener, Speaker, canListen, splitSentences } from './voice'
+import { Listener, SILENCE_MS, Speaker, canListen, splitSentences } from './voice'
 
 const speaker = new Speaker()
 const listener = new Listener()
@@ -23,6 +23,17 @@ interface Message {
 }
 
 type Mode = 'voice' | 'text' | 'preset'
+
+// Per-turn latency, shown with ?debug. Times are ms after the reply was captured.
+interface Timing {
+  step: StepId
+  silence: number
+  firstAudio?: number
+  model?: number
+  waitedOnModel: boolean
+}
+
+const DEBUG = new URLSearchParams(location.search).has('debug')
 
 class Cancelled extends Error {}
 
@@ -46,7 +57,7 @@ export default function App() {
   const [warm, setWarm] = useState(true)
   const [filled, setFilled] = useState<BookField[]>([])
   const [submitted, setSubmitted] = useState(false)
-  const [, setVoiceTick] = useState(0)
+  const [timings, setTimings] = useState<Timing[]>([])
   const [micError, setMicError] = useState('')
   const [showTranscript, setShowTranscript] = useState(false)
   const [callStart, setCallStart] = useState(0)
@@ -60,15 +71,20 @@ export default function App() {
   const skipRef = useRef(0)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const msgId = useRef(0)
+  const timingRef = useRef<{ index: number; at: number } | null>(null)
+  const stepRef = useRef<StepId>('intro')
 
   useEffect(() => {
-    const prefetchIntro = () => speaker.prefetch(STEPS[0].ask(emptyProfile()))
-    speaker.onStatus = () => {
-      setVoiceTick((n) => n + 1)
-      prefetchIntro()
+    speaker.prefetch(STEPS[0].ask(emptyProfile()))
+    listener.onInterim = (text) => {
+      setInterim(text)
+      // Build the acknowledgement from what we've heard so far and fetch its audio during
+      // the silence wait, so the guide can answer the moment the turn ends.
+      const step = stepRef.current
+      if (text && (step === 'intro' || step === 'calls')) {
+        speaker.prefetch(ackFor(step, { ...profileRef.current, ...localTurn(step, text).slots }))
+      }
     }
-    prefetchIntro()
-    listener.onInterim = setInterim
     listener.onError = (e) => setMicError(e === 'not-allowed' ? 'Microphone blocked. You can type instead.' : `Mic error: ${e}`)
   }, [])
 
@@ -98,6 +114,13 @@ export default function App() {
 
   // ---- conversation runner -------------------------------------------------
 
+  function markTiming(field: 'firstAudio' | 'model', index = timingRef.current?.index) {
+    const t = timingRef.current
+    if (!t || index === undefined) return
+    const ms = Math.round(performance.now() - t.at)
+    setTimings((xs) => xs.map((x, i) => (i === index && x[field] === undefined ? { ...x, [field]: ms } : x)))
+  }
+
   function guard(run: number) {
     if (run !== runRef.current) throw new Cancelled()
   }
@@ -109,7 +132,7 @@ export default function App() {
     if (!text) return
     addMessage('guide', text)
     setSpeaking(true)
-    await speaker.speak(pieces.flatMap(splitSentences), GUIDE_VOICE)
+    await speaker.speak(pieces.flatMap(splitSentences), GUIDE_VOICE, (i) => i === 0 && markTiming('firstAudio'))
     setSpeaking(false)
     guard(run)
   }
@@ -119,6 +142,8 @@ export default function App() {
     const preset = presetRef.current
     if (modeRef.current === 'preset' && preset) {
       const line = preset.preset.lines[preset.index++] ?? 'Yes.'
+      const step = stepRef.current
+      if (step === 'intro' || step === 'calls') speaker.prefetch(ackFor(step, { ...profileRef.current, ...localTurn(step, line).slots }))
       await wait(500)
       const skip = skipRef.current
       for (let i = 1; i <= line.length; i += 2) {
@@ -182,7 +207,7 @@ export default function App() {
     const lines = [
       `Here's your team${p.name ? `, ${p.name}` : ''}.`,
       ...team.map((id) => `${AGENTS[id].name} handles ${AGENTS[id].role.toLowerCase()}.`),
-      `Want to hear one of them on a real call? ${AGENTS[featured].name} is a good place to start.`,
+      `Want to hear ${AGENTS[featured].name} on a quick call?`,
     ]
     return { team, featured, lines }
   }
@@ -199,23 +224,31 @@ export default function App() {
     return featured
   }
 
+  const doneLine = () =>
+    `Sent. An Agent Manager will reach out within a business day. Thanks${profileRef.current.name ? `, ${profileRef.current.name}` : ''}, lovely meeting you.`
+
   const greetingIntro = () =>
-    `Now my favorite part. Here's how Anna would greet a patient calling ${profileRef.current.practice ?? 'your practice'}.`
-  const BOOK_PROMPT = "That's your agent, in your voice. Want to get it live? I've already filled in a kickoff request for our team from everything you told me. I just need your email and your role."
+    `Here's how Anna would greet a patient calling ${profileRef.current.practice ?? 'your practice'}.`
+  const BOOK_PROMPT = "That's your agent. I've filled in your kickoff request from our call. What's your email, and your role?"
 
   // Queue audio for whatever the guide will say after this reply, while the user is still talking.
   function prefetchAfter(step: StepId) {
     const p = profileRef.current
     const next = nextStep(step)
     if (step === 'warmth') {
+      speaker.prefetch(ackFor('warmth', p))
       speaker.prefetch(teamIntro().lines)
     } else if (step === 'tour') {
       const { featured } = teamIntro()
       for (const l of sampleCall(featured, p.practice ?? '')) speaker.prefetch(l.text, l.who === 'agent' ? AGENTS[featured].voice : PATIENT_VOICE)
+      speaker.prefetch(['No problem.', `That was ${AGENTS[featured].name}.`])
       speaker.prefetch(greetingIntro())
       speaker.prefetch(greetingScript(p, true), AGENTS.anna.voice)
       speaker.prefetch(BOOK_PROMPT)
+    } else if (step === 'confirm') {
+      speaker.prefetch(doneLine())
     } else if (next !== 'tour' && next !== 'book' && next !== 'done') {
+      if (step === 'book') speaker.prefetch(ackFor('book', p))
       speaker.prefetch(STEPS.find((s) => s.id === next)!.ask(p))
     }
   }
@@ -249,10 +282,12 @@ export default function App() {
     let prefix = ''
     let reask = true
     let featured: AgentId = 'anna'
+    let turnCount = 0
 
     while (step !== 'done') {
       const def = STEPS.find((s) => s.id === step)!
       setStep(step)
+      stepRef.current = step
       let question = def.ask(profileRef.current)
 
       if (reask) {
@@ -260,7 +295,7 @@ export default function App() {
           setView('team')
           if (prefix) await say(run, prefix)
           featured = await introduceTeam(run)
-          question = 'Want to hear one of them on a real call?'
+          question = `Want to hear ${AGENTS[featured].name} on a quick call?`
         } else if (step === 'book') {
           await showGreetingAndBook(run, prefix)
           question = 'What is your email and your role?'
@@ -274,14 +309,33 @@ export default function App() {
       prefetchAfter(step)
       const reply = await getReply(run)
       addMessage('user', reply)
-      setThinking(true)
-      const result = await understand(step, question, reply, profileRef.current)
-      setThinking(false)
-      guard(run)
-      updateProfile(result.slots)
+
+      // Understand the reply instantly with keywords and keep the conversation moving;
+      // the model corrects the profile in the background. Only wait for it when the
+      // keywords couldn't make sense of the answer.
+      const local = localTurn(step, reply)
+      updateProfile(local.slots)
+      const index = turnCount++
+      const turnStep = step
+      timingRef.current = { index, at: performance.now() }
+      setTimings((xs) => [...xs, { step: turnStep, silence: modeRef.current === 'voice' ? SILENCE_MS : 0, waitedOnModel: !local.advance }])
+      const usesModel = step !== 'tour' && (step !== 'confirm' || !local.advance)
+      const model = usesModel ? refine(step, question, reply, profileRef.current) : Promise.resolve(null)
+      void model.then((r) => {
+        markTiming('model', index)
+        if (r && run === runRef.current) updateProfile(r.slots)
+      })
+
+      let result = local
+      if (!local.advance) {
+        setThinking(true)
+        result = (await model) ?? local
+        setThinking(false)
+        guard(run)
+      }
 
       if (!result.advance) {
-        await say(run, result.ack)
+        await say(run, result.clarify ?? local.clarify ?? 'Sorry, could you say that again?')
         reask = false
         continue
       }
@@ -289,20 +343,20 @@ export default function App() {
 
       if (step === 'tour' && result.playSample) {
         const id = (result.playSample in AGENTS ? result.playSample : featured) as AgentId
+        markTiming('firstAudio')
         await playSample(run, id)
         prefix = `That was ${AGENTS[id].name}.`
       } else if (step === 'tour') {
         prefix = 'No problem.'
       } else {
-        prefix = result.ack
+        prefix = ackFor(step, profileRef.current)
       }
       step = nextStep(step)
     }
 
     setStep('done')
     setSubmitted(true)
-    const p = profileRef.current
-    await say(run, `Sent. Someone from Prosper will reach out within a business day to book your week one kickoff with an Agent Manager. Thank you${p.name ? `, ${p.name}` : ''}, it was lovely meeting you.`)
+    await say(run, doneLine())
   }
 
   function start(m: Mode, preset?: Preset) {
@@ -325,6 +379,8 @@ export default function App() {
     presetRef.current = preset ? { preset, index: 0 } : null
     setModeBoth(m)
     setShowTranscript(false)
+    setTimings([])
+    timingRef.current = null
     setCallStart(Date.now())
     setCallSeconds(0)
     setStarted(true)
@@ -527,6 +583,26 @@ export default function App() {
         />
       </main>
 
+      {DEBUG && (
+        <aside className="debug">
+          <strong>Turn latency (ms after your reply was captured)</strong>
+          <table>
+            <thead><tr><th>step</th><th>silence wait</th><th>first audio</th><th>model</th></tr></thead>
+            <tbody>
+              {timings.map((t, i) => (
+                <tr key={i}>
+                  <td>{t.step}</td>
+                  <td>{t.silence || '-'}</td>
+                  <td className={t.waitedOnModel ? 'slow' : ''}>{t.firstAudio ?? '…'}</td>
+                  <td>{t.model ?? '…'}{t.waitedOnModel ? ' (waited)' : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <span>Time from your last word to the guide speaking = silence wait + first audio.</span>
+        </aside>
+      )}
+
       <footer className="footer">
         Prototype with mock data only. No PHI, no real EHR integration, no data is stored. Agent names and roles are from getprosper.ai; sample calls are illustrative.
       </footer>
@@ -538,16 +614,19 @@ function Welcome({ onStart }: { onStart: (m: Mode, preset?: Preset) => void }) {
   return (
     <div className="welcome">
       <div className="orb big-orb orb-idle" aria-hidden><span /><span /><span /></div>
-      <h2>Skip the demo form. Talk to a Prosper agent for two minutes.</h2>
+      <h2>Hear a Prosper agent on your own practice, in under a minute.</h2>
       <p className="lede">
-        It's the same technology that will answer your patients' calls. Tell it about your practice and it
-        builds your AI front desk while you talk: your agents, your warmth rules, your kickoff with our team.
+        Tell it about your practice in a few sentences. It builds your AI front desk while you talk,
+        plays your own agent greeting a patient, and hands our team everything they need for your kickoff.
       </p>
       <button className="primary big" onClick={() => onStart(canListen ? 'voice' : 'text')}>
         <PhoneIcon /> Start a call
       </button>
       <button className="link small" onClick={() => onStart('text')}>or type instead</button>
       {!canListen && <p className="muted small">Voice input needs Chrome. Typing works everywhere.</p>}
+      <p className="muted small">
+        Already decided? <a href="https://www.getprosper.ai/get-started" target="_blank" rel="noreferrer">The demo form is still there.</a>
+      </p>
 
       <div className="presets">
         <div className="eyebrow">Or listen to a sample call</div>

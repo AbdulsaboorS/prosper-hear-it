@@ -24,7 +24,7 @@ const STEP_FIELDS: Record<string, { fields: Record<string, unknown>; rule: strin
       providers: { type: 'integer', description: 'Number of providers, if mentioned' },
       ehr: { type: 'string', enum: ['athenahealth', 'ModMed', 'eClinicalWorks', 'Epic', 'NextGen', 'Other'], description: 'Their EHR, if mentioned; any unlisted EHR is "Other"' },
     },
-    rule: 'Extract every field they mention, including their first name ("I\'m Abdul" -> name "Abdul"). advance=true once practice or specialty is known. If both are missing, advance=false and ask for them.',
+    rule: 'Extract every field they mention, including their first name ("I\'m Abdul" -> name "Abdul"). advance=true once practice or specialty is known. If both are missing, advance=false.',
   },
   calls: {
     fields: {
@@ -47,34 +47,28 @@ const STEP_FIELDS: Record<string, { fields: Record<string, unknown>; rule: strin
   },
   tour: {
     fields: {},
-    rule: `They were asked whether they want to hear a sample call from one of their agents. Set playSample to an agent id from ${AGENTS.join(', ')} if they named one, "auto" if they said yes without naming one, or "none" if they declined. ack should be empty. Always advance=true.`,
+    rule: `They were asked whether they want to hear a sample call from one of their agents. Set playSample to an agent id from ${AGENTS.join(', ')} if they named one, "auto" if they said yes without naming one, or "none" if they declined. Always advance=true.`,
   },
   book: {
     fields: {
       email: { type: 'string', description: 'Email address, normalized from speech ("dana at harbor dot com" -> dana@harbor.com), lowercase' },
       role: { type: 'string', description: 'Job title, title case' },
     },
-    rule: 'advance=true if an email is known. If not, advance=false and ask for it.',
+    rule: 'advance=true if an email is known.',
   },
   confirm: {
     fields: {},
-    rule: 'They were asked whether to send their kickoff request. advance=true if they agree. If they hesitate, advance=false and reassure them they can edit anything first. ack should be empty if advance=true.',
+    rule: 'They were asked whether to send their kickoff request. advance=true if they agree. If they hesitate, advance=false and reassure them they can edit anything first.',
   },
 }
 
-const SYSTEM = `You are Prosper Guide, a warm voice onboarding agent for Prosper AI, which provides AI voice agents to healthcare practices.
-You are mid-conversation with a practice leader. Each turn you get the question you just asked and what they said back (from speech recognition, so expect transcription errors and fix them).
+const SYSTEM = `You understand replies in a voice onboarding call between Prosper AI (AI voice agents for healthcare practices) and a practice leader.
+Each turn you get the question that was asked and what they said back (from speech recognition, so expect transcription errors and fix them, e.g. capitalize practice names).
 Return JSON only:
 - slots: fields you can extract for this step (omit unknown ones, never invent)
-- ack: what you say back, ONE short spoken sentence, under 25 words. Repeat back the specific thing they told you, in your own words, warmly, like a person who was listening. When advance=true it must be a statement, never a question (no "is that right?"), because the app asks the next question right after. When advance=false, ask only for what is missing. Don't use their name; the app does that. No emoji, no markdown, no lists.
 - advance: whether this step is complete
-- playSample: only for the tour step
-
-Good acks (warm, specific, 12-25 words, statements):
-- "Bayview Dermatology, twelve providers. That's a busy practice, and I've started your practice card."
-- "Prior auths for biologics are a grind. Kate lives for those, so she's joining your team."
-- "Greeting every patient by name, and a real person for anyone anxious about results. I love that, and it's locked in."
-Bad acks: "You're from Bay View Dermatology." (curt, robotic) / "Got it, is that right?" (asks a question)`
+- clarify: only when advance=false, one short spoken question asking for what is missing, warm and natural; otherwise ""
+- playSample: only for the tour step`
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const body = (await request.json()) as TurnRequest
@@ -85,11 +79,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     type: 'object',
     properties: {
       slots: { type: 'object', properties: spec.fields, ...(spec.required ? { required: spec.required } : {}) },
-      ack: { type: 'string' },
       advance: { type: 'boolean' },
+      clarify: { type: 'string' },
       playSample: { type: 'string' },
     },
-    required: ['slots', 'ack', 'advance'],
+    required: ['slots', 'advance'],
   }
 
   const user = `Step: ${body.step}

@@ -1,12 +1,12 @@
 import type { Profile } from './data'
-import { localTurn, type StepId, type TurnResult } from './flow'
+import type { StepId, TurnResult } from './flow'
 
 const TIMEOUT_MS = 6000
 
-// Ask the Workers AI model to understand the reply; fall back to keyword rules
-// if the API is down, slow, or returns something unusable.
-export async function understand(step: StepId, question: string, utterance: string, profile: Profile): Promise<TurnResult> {
-  const local = localTurn(step, utterance, profile)
+// Ask the Workers AI model to understand a reply. The app doesn't wait on this when the
+// keyword pass already understood the answer; it just corrects the profile when it lands.
+// Resolves to null if the API is down, slow, or returns something unusable.
+export async function refine(step: StepId, question: string, utterance: string, profile: Profile): Promise<TurnResult | null> {
   try {
     const res = await fetch('/api/turn', {
       method: 'POST',
@@ -15,22 +15,12 @@ export async function understand(step: StepId, question: string, utterance: stri
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) throw new Error(`turn ${res.status}`)
-    const llm = (await res.json()) as { slots?: Partial<Profile>; ack?: string; advance?: boolean; playSample?: string }
+    const llm = (await res.json()) as { slots?: Partial<Profile>; clarify?: string; advance?: boolean }
     if (typeof llm.advance !== 'boolean') throw new Error('bad shape')
-
-    // Keep anything the keyword pass caught that the model missed.
-    const slots = { ...local.slots, ...clean(llm.slots ?? {}) }
-    const advance = llm.advance || (local.advance && step !== 'intro' && step !== 'book')
-    return {
-      slots,
-      ack: punctuate((llm.ack ?? '').trim()) || (advance ? local.ack : ''),
-      advance,
-      playSample: step === 'tour' ? (llm.playSample === 'none' ? undefined : llm.playSample ?? local.playSample) : undefined,
-      source: 'llm',
-    }
+    return { slots: clean(llm.slots ?? {}), advance: llm.advance, clarify: llm.clarify?.trim() || undefined }
   } catch (err) {
-    console.warn('Falling back to local understanding', err)
-    return local
+    console.warn('Model unavailable, keeping keyword understanding', err)
+    return null
   }
 }
 
@@ -54,5 +44,3 @@ function clean(slots: Partial<Profile>): Partial<Profile> {
 function strip(p: Profile) {
   return Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined && !(Array.isArray(v) && !v.length)))
 }
-
-const punctuate = (s: string) => (s && !/[.!?]$/.test(s) ? `${s}.` : s)

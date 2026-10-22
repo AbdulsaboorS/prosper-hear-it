@@ -1,63 +1,11 @@
-// Speaking: Deepgram Aura-2 via /api/tts (default) or Kokoro in a Web Worker (?voice=kokoro),
-// with the browser's speechSynthesis as the last fallback.
+// Speaking: Deepgram Aura-2 via /api/tts, falling back to the browser's speechSynthesis.
 // Listening: Chrome's webkitSpeechRecognition, hands-free with a silence timeout.
 
-type WorkerOut =
-  | { type: 'progress'; value: number }
-  | { type: 'ready'; device: string }
-  | { type: 'error'; error: string }
-  | { type: 'audio'; id: number; samples: Float32Array; rate: number }
-
-export type VoiceStatus = 'loading' | 'ready' | 'fallback'
-
-// Voices are Aura-2 speaker names; Kokoro maps them onto its own.
-const KOKORO_VOICES: Record<string, string> = {
-  thalia: 'af_heart', andromeda: 'af_bella', helena: 'af_nicole', athena: 'af_sarah', hera: 'af_sky',
-  luna: 'af_nova', asteria: 'af_kore', arcas: 'am_michael', apollo: 'am_adam', orion: 'am_fenrir',
-  odysseus: 'am_puck', orpheus: 'am_eric', hermes: 'am_liam', aurora: 'bf_emma',
-}
-
 export class Speaker {
-  readonly engine = new URLSearchParams(location.search).get('voice') === 'kokoro' ? 'kokoro' : 'aura'
-  status: VoiceStatus = this.engine === 'aura' ? 'ready' : 'loading'
-  progress = 0
-  onStatus?: () => void
-
-  private worker?: Worker
   private ctx = new AudioContext()
   private source?: AudioBufferSourceNode
-  private pending = new Map<number, (a: { samples: Float32Array; rate: number }) => void>()
   private cache = new Map<string, Promise<AudioBuffer>>()
-  private nextId = 0
   private generation = 0
-
-  constructor() {
-    if (this.engine === 'kokoro') this.loadKokoro()
-  }
-
-  private loadKokoro() {
-    this.worker = new Worker(new URL('./tts.worker.ts', import.meta.url), { type: 'module' })
-    this.worker.onmessage = (e: MessageEvent<WorkerOut>) => {
-      const m = e.data
-      if (m.type === 'progress') this.progress = m.value
-      else if (m.type === 'ready') this.status = 'ready'
-      else if (m.type === 'error') {
-        console.warn('Kokoro failed, using browser voice', m.error)
-        this.status = 'fallback'
-      } else if (m.type === 'audio') {
-        this.pending.get(m.id)?.(m)
-        this.pending.delete(m.id)
-      }
-      this.onStatus?.()
-    }
-    const device = new URLSearchParams(location.search).get('voice-device') ?? undefined
-    this.worker.postMessage({ type: 'load', device })
-  }
-
-  useFallback() {
-    this.status = 'fallback'
-    this.onStatus?.()
-  }
 
   // Must be called from a user gesture so audio can play.
   unlock() {
@@ -76,17 +24,15 @@ export class Speaker {
   async speak(text: string | string[], voice = 'thalia', onSentence?: (i: number) => void) {
     const gen = ++this.generation
     const sentences = typeof text === 'string' ? splitSentences(text) : text
-    if (!sentences.length) return
-    if (this.status !== 'ready') return this.speakBrowser(sentences.join(' '), gen)
-
     const audios = sentences.map((s) => this.generate(s, voice))
     for (let i = 0; i < sentences.length; i++) {
       const audio = await audios[i].catch(() => null)
+      if (gen !== this.generation) return
       if (!audio) {
         // Voice service unavailable: say the rest with the browser voice.
+        onSentence?.(i)
         return this.speakBrowser(sentences.slice(i).join(' '), gen)
       }
-      if (gen !== this.generation) return
       onSentence?.(i)
       await this.play(audio, gen)
       if (gen !== this.generation) return
@@ -99,9 +45,8 @@ export class Speaker {
     return this.speakBrowser(text, gen, true)
   }
 
-  // Generate scripted lines ahead of time (while the user is talking) so they play instantly.
+  // Fetch lines ahead of time (while the user is talking) so they play instantly.
   prefetch(text: string | string[], voice = 'thalia') {
-    if (this.status !== 'ready') return
     for (const s of typeof text === 'string' ? splitSentences(text) : text) this.generate(s, voice).catch(() => {})
   }
 
@@ -110,14 +55,14 @@ export class Speaker {
     const key = `${voice}|${text}`
     let audio = this.cache.get(key)
     if (!audio) {
-      audio = this.engine === 'aura' ? this.fetchAura(text, voice) : this.runKokoro(text, voice)
+      audio = this.fetchAudio(text, voice)
       audio.catch(() => this.cache.delete(key))
       this.cache.set(key, audio)
     }
     return audio
   }
 
-  private async fetchAura(text: string, voice: string) {
+  private async fetchAudio(text: string, voice: string) {
     const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -126,18 +71,6 @@ export class Speaker {
     })
     if (!res.ok) throw new Error(`tts ${res.status}`)
     return this.ctx.decodeAudioData(await res.arrayBuffer())
-  }
-
-  private runKokoro(text: string, voice: string) {
-    const id = this.nextId++
-    return new Promise<AudioBuffer>((resolve) => {
-      this.pending.set(id, ({ samples, rate }) => {
-        const buffer = this.ctx.createBuffer(1, samples.length, rate)
-        buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0)
-        resolve(buffer)
-      })
-      this.worker!.postMessage({ type: 'generate', id, text, voice: KOKORO_VOICES[voice] ?? 'af_heart', speed: 1 })
-    })
   }
 
   private play(buffer: AudioBuffer, gen: number) {
@@ -198,7 +131,7 @@ const Ctor = RecognitionCtor.SpeechRecognition ?? RecognitionCtor.webkitSpeechRe
 
 export const canListen = !!Ctor
 
-const SILENCE_MS = 1600
+export const SILENCE_MS = 1000
 
 export class Listener {
   onInterim?: (text: string) => void
