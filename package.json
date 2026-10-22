@@ -1,5 +1,5 @@
 {
-  "name": "prosper-voice-onboarder",
+  "name": "prosper-hear-it",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,7 @@
     "dev": "vite build && wrangler pages dev dist --port 8788",
     "dev:ui": "vite",
     "build": "tsc -b && vite build",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name prosper-voice-onboarder",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name prosper-hear-it",
     "lint": "oxlint"
   },
   "dependencies": {
