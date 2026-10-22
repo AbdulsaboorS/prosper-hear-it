@@ -8,7 +8,7 @@ This is an unofficial concept by [Abdul Saboor Shaikh](https://abdulsaboorshaikh
 
 ## Why
 
-On getprosper.ai, the Use Cases page lists 8+ agents, and only Anna has a recording. Everything else leads to the Get Started form or a demo phone number that gives every caller the same generic call.
+On getprosper.ai, the Use Cases page lists more than a dozen agents, and only Anna has a recording. Everything else leads to the Get Started form or a demo phone number that gives every caller the same generic call.
 
 Competitors are moving on this first touch:
 
@@ -21,7 +21,7 @@ None of them make the demo about the visitor's own practice. This does: every ag
 
 | | |
 |---|---|
-| **Hypothesis** | Hearing the agents on your own practice converts more Use Cases visitors into demo requests than one generic recording does. |
+| **Hypothesis** | Hearing the agents on your own practice converts more Use Cases visitors into demo requests than a single recording does. |
 | **Test** | A/B test the personalized agent grid against the current Use Cases page. |
 | **Primary metric** | Visitor to demo-request conversion. |
 | **Secondary metrics** | Agents played per visitor; demo-to-close rate for visitors who played an agent. |
