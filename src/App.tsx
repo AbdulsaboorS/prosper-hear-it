@@ -16,7 +16,6 @@ export default function App() {
   const [specialtyId, setSpecialtyId] = useState(SPECIALTIES[0].id)
   const [playing, setPlaying] = useState<Playing | null>(null)
   const [heard, setHeard] = useState<AgentId[]>([])
-  const [warm, setWarm] = useState(true)
   const [briefOpen, setBriefOpen] = useState(false)
   const runRef = useRef(0)
 
@@ -30,7 +29,7 @@ export default function App() {
     setSpecialtyId(specId)
     // Warm the cache with each call's opening line so the first press plays instantly.
     for (const ag of AGENTS) speaker.prefetch(sampleCall(ag.id, name.trim(), spec)[0].text, ag.voice)
-    speaker.prefetch(greeting(name.trim(), spec, true), 'andromeda')
+    speaker.prefetch(greeting(name.trim(), spec), 'andromeda')
   }
 
   function stop() {
@@ -63,9 +62,7 @@ export default function App() {
     stop()
     const run = runRef.current
     setPlaying({ id: 'greeting' })
-    const text = greeting(practice, specialty, warm)
-    if (warm) await speaker.speak(text, 'andromeda')
-    else await speaker.speakRobot(text)
+    await speaker.speak(greeting(practice, specialty), 'andromeda')
     if (run === runRef.current) setPlaying(null)
   }
 
@@ -120,21 +117,15 @@ export default function App() {
           <div className="greeting-head">
             <div>
               <div className="eyebrow">Anna answers {name}</div>
-              <h3>{warm ? 'Warm, like your front desk' : 'Cold, like a phone tree'}</h3>
-            </div>
-            <div className="toggle" role="group" aria-label="Greeting style">
-              <button className={!warm ? 'on cold' : ''} onClick={() => { stop(); setWarm(false) }}>Cold</button>
-              <button className={warm ? 'on' : ''} onClick={() => { stop(); setWarm(true) }}>Warm</button>
+              <h3>Warm, like your best front desk</h3>
             </div>
           </div>
-          <blockquote className={warm ? 'warm' : 'cold'}>{greeting(practice, specialty, warm)}</blockquote>
+          <blockquote>{greeting(practice, specialty)}</blockquote>
           <div className="greeting-foot">
             <button className="primary" onClick={greetingPlaying ? stop : playGreeting}>
               {greetingPlaying ? '■ Stop' : '▶ Hear Anna'}
             </button>
-            <span className="muted small">
-              {warm ? "Uses the patient's name, acknowledges the worry, offers a human." : 'Menu-speak, no name, no way to a person.'}
-            </span>
+            <span className="muted small">Uses the patient's name, acknowledges the worry, offers a human.</span>
           </div>
         </div>
       </section>

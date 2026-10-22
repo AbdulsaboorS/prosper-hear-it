@@ -74,13 +74,7 @@ a { color: inherit; }
 .greeting.live { box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow); }
 .greeting-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .greeting-head h3 { font-size: 22px; margin-top: 4px; }
-.toggle { display: inline-flex; padding: 3px; background: var(--line-2); border-radius: 999px; flex: none; }
-.toggle button { padding: 7px 16px; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--muted); transition: all 0.2s; }
-.toggle button.on { background: var(--accent); color: #fff; }
-.toggle button.on.cold { background: #5b6670; }
-blockquote { margin: 0; flex: 1; font-family: var(--serif); font-size: 18px; line-height: 1.55; padding: 18px 20px; border-radius: var(--radius-sm); transition: background 0.3s, color 0.3s; }
-blockquote.warm { background: var(--card); color: var(--ink); border-left: 4px solid var(--accent); }
-blockquote.cold { background: #eef0f2; color: #5b6670; font-family: ui-monospace, Menlo, monospace; font-size: 14.5px; border-left: 4px solid #9aa4ad; }
+blockquote { margin: 0; flex: 1; font-family: var(--serif); font-size: 18px; line-height: 1.55; padding: 18px 20px; border-radius: var(--radius-sm); background: var(--card); color: var(--ink); border-left: 4px solid var(--accent); }
 .greeting-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
 /* Agents */

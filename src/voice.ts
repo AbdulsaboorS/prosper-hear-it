@@ -38,12 +38,6 @@ export class Speaker {
     }
   }
 
-  // The "cold" phone-menu voice for the comparison.
-  speakRobot(text: string) {
-    const gen = ++this.generation
-    return this.speakBrowser(text, gen, true)
-  }
-
   // Fetch lines ahead of time (while the user is talking) so they play instantly.
   prefetch(text: string | string[], voice = 'thalia') {
     for (const s of typeof text === 'string' ? splitSentences(text) : text) this.generate(s, voice).catch(() => {})
@@ -84,15 +78,12 @@ export class Speaker {
     })
   }
 
-  private speakBrowser(text: string, gen: number, robot = false) {
+  private speakBrowser(text: string, gen: number) {
     return new Promise<void>((resolve) => {
       if (gen !== this.generation) return resolve()
       const u = new SpeechSynthesisUtterance(text)
       const voices = speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'))
-      // The cold voice is the stock system voice, like a phone menu; the warm fallback prefers newer voices.
-      u.voice = robot
-        ? voices.find((v) => /Samantha|Google US English/.test(v.name)) ?? voices[0] ?? null
-        : voices.find((v) => /Ava|Allison|Samantha|Google US English/.test(v.name)) ?? voices[0] ?? null
+      u.voice = voices.find((v) => /Ava|Allison|Samantha|Google US English/.test(v.name)) ?? voices[0] ?? null
       u.onend = () => resolve()
       u.onerror = () => resolve()
       speechSynthesis.speak(u)
