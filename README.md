@@ -68,14 +68,7 @@ Add `?debug` to the URL to see per-turn latency: the silence wait, time to the g
 
 Names and roles are from getprosper.ai. Payer-side agents are left out because this onboards a provider practice. Sample calls are illustrative.
 
-## Run it locally
-
-```bash
-npm install
-npm run dev     # builds, then serves the app and API at http://localhost:8788
-```
-
-Needs Chrome for voice, and `wrangler` logged in to a Cloudflare account (for Workers AI). `npm run dev:ui` runs the front end alone; without the API it falls back to keyword understanding and the browser's voice. `npm run deploy` publishes to Cloudflare Pages.
+## Code
 
 ```
 src/
