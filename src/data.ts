@@ -1,179 +1,152 @@
 export type AgentId =
-  | 'anna' | 'emma' | 'ben' | 'tom' | 'jack' | 'alex' | 'kate' | 'mary' | 'lucy' | 'sara' | 'james'
-
-export type CallType =
-  | 'scheduling' | 'billing' | 'benefits' | 'priorAuth' | 'reminders'
-  | 'switchboard' | 'claims' | 'refills' | 'recall'
-
-export type Ehr = 'athenahealth' | 'ModMed' | 'eClinicalWorks' | 'Epic' | 'NextGen' | 'Other'
-export type PainTime = 'mornings' | 'lunch' | 'after hours' | 'all day'
-export type Language = 'English' | 'Spanish' | 'Other'
+  | 'anna' | 'tom' | 'jack' | 'james' | 'sara' | 'emma' | 'ben' | 'alex' | 'kate' | 'lucy' | 'mary'
 
 export interface Agent {
   id: AgentId
   name: string
   role: string
   blurb: string
+  // Deepgram Aura-2 speaker.
   voice: string
+  // Who is on the other end of the sample call.
+  with: 'patient' | 'payer'
 }
 
-export const AGENTS: Record<AgentId, Agent> = {
-  anna: { id: 'anna', name: 'Anna', role: 'Appointment Scheduling', blurb: 'Books, reschedules and fills cancellations straight into your calendar.', voice: 'andromeda' },
-  emma: { id: 'emma', name: 'Emma', role: 'Inbound Billing Questions', blurb: 'Explains statements and takes payments without a hold queue.', voice: 'helena' },
-  ben: { id: 'ben', name: 'Ben', role: 'Patient Balance Reminders', blurb: 'Calls patients about open balances, kindly, and sets up payment.', voice: 'arcas' },
-  tom: { id: 'tom', name: 'Tom', role: 'Appointment Reminders', blurb: 'Confirms tomorrow\'s visits and rebooks the ones that can\'t make it.', voice: 'apollo' },
-  jack: { id: 'jack', name: 'Jack', role: 'Switchboard', blurb: 'Answers every line and routes callers to the right person.', voice: 'orion' },
-  alex: { id: 'alex', name: 'Alex', role: 'Benefits Verification', blurb: 'Calls payers to verify coverage before the patient arrives.', voice: 'odysseus' },
-  kate: { id: 'kate', name: 'Kate', role: 'Prior Authorization', blurb: 'Initiates and follows up on prior auths with payers.', voice: 'athena' },
-  mary: { id: 'mary', name: 'Mary', role: 'Denial Follow-up', blurb: 'Gathers denial reasons from payers so appeals move fast.', voice: 'hera' },
-  lucy: { id: 'lucy', name: 'Lucy', role: 'Claim Follow-up', blurb: 'Chases claims that haven\'t adjudicated and logs status in your EHR.', voice: 'luna' },
-  sara: { id: 'sara', name: 'Sara', role: 'Re-Engagement Campaigns', blurb: 'Brings overdue patients back for recalls and follow-ups.', voice: 'asteria' },
-  james: { id: 'james', name: 'James', role: 'Prescription Refills', blurb: 'Takes refill requests and routes them to the right provider.', voice: 'orpheus' },
-}
+const agent = (id: AgentId, name: string, role: string, blurb: string, voice: string, withWho: Agent['with']): Agent =>
+  ({ id, name, role, blurb, voice, with: withWho })
 
-export const CALL_TYPES: { id: CallType; label: string; agents: AgentId[] }[] = [
-  { id: 'scheduling', label: 'Scheduling', agents: ['anna'] },
-  { id: 'billing', label: 'Billing questions', agents: ['emma', 'ben'] },
-  { id: 'benefits', label: 'Benefits verification', agents: ['alex'] },
-  { id: 'priorAuth', label: 'Prior auth', agents: ['kate'] },
-  { id: 'reminders', label: 'Reminders', agents: ['tom'] },
-  { id: 'switchboard', label: 'Switchboard', agents: ['jack'] },
-  { id: 'claims', label: 'Claims & denials', agents: ['lucy', 'mary'] },
-  { id: 'refills', label: 'Refills', agents: ['james'] },
-  { id: 'recall', label: 'Recalls', agents: ['sara'] },
+export const AGENTS: Agent[] = [
+  agent('anna', 'Anna', 'Appointment Scheduling', 'Books, reschedules and fills cancellations.', 'andromeda', 'patient'),
+  agent('tom', 'Tom', 'Appointment Reminders', 'Confirms visits and rebooks the ones that can\'t make it.', 'apollo', 'patient'),
+  agent('jack', 'Jack', 'Switchboard', 'Answers every line and routes callers.', 'orion', 'patient'),
+  agent('james', 'James', 'Prescription Refills', 'Takes refill requests and routes them to the provider.', 'orpheus', 'patient'),
+  agent('sara', 'Sara', 'Re-Engagement Campaigns', 'Brings overdue patients back in.', 'asteria', 'patient'),
+  agent('emma', 'Emma', 'Inbound Billing Questions', 'Explains bills and sets up payment plans.', 'helena', 'patient'),
+  agent('ben', 'Ben', 'Patient Balance Reminders', 'Collects open balances, kindly.', 'arcas', 'patient'),
+  agent('alex', 'Alex', 'Benefits Verification', 'Verifies coverage with payers before the visit.', 'odysseus', 'payer'),
+  agent('kate', 'Kate', 'Prior Authorization', 'Initiates and follows up on prior auths.', 'athena', 'payer'),
+  agent('lucy', 'Lucy', 'Claim Follow-up', 'Chases claims that haven\'t been decided.', 'luna', 'payer'),
+  agent('mary', 'Mary', 'Denial Follow-up', 'Gets denial reasons so appeals move fast.', 'hera', 'payer'),
 ]
 
-export const EHRS: Ehr[] = ['athenahealth', 'ModMed', 'eClinicalWorks', 'Epic', 'NextGen', 'Other']
-export const PAIN_TIMES: PainTime[] = ['mornings', 'lunch', 'after hours', 'all day']
-export const LANGUAGES: Language[] = ['English', 'Spanish', 'Other']
+export const PATIENT_VOICE = 'aurora'
+export const PAYER_VOICE = 'hermes'
 
-export interface Profile {
-  name?: string
-  practice?: string
-  specialty?: string
-  providers?: number
-  callTypes: CallType[]
-  ehr?: Ehr
-  painTimes: PainTime[]
-  callsPerDay?: number
-  greetingStyle?: string
-  humanRule?: string
-  // Second-person clause for scripts, e.g. "you're worried about a biopsy result"
-  humanTrigger?: string
-  toneNotes?: string
-  languages: Language[]
-  email?: string
-  role?: string
-}
-
-export const emptyProfile = (): Profile => ({ callTypes: [], painTimes: [], languages: [] })
-
-export function teamFor(callTypes: CallType[]): AgentId[] {
-  const ids = CALL_TYPES.filter((c) => callTypes.includes(c.id)).flatMap((c) => c.agents)
-  return [...new Set(ids)]
-}
-
-// One scripted reply per turn, in flow order (see STEPS in flow.ts).
-export interface Preset {
+// The specialty-specific details that make each sample call sound like the visitor's practice.
+export interface Specialty {
   id: string
   label: string
-  detail: string
-  lines: string[]
+  visit: string
+  followup: string
+  procedure: string
+  medication: string
+  // Completes "And if ___, I'll get you to someone on our team right away."
+  human: string
 }
 
-export const PRESETS: Preset[] = [
-  {
-    id: 'derm',
-    label: 'Dermatology group',
-    detail: '12 providers · ModMed · after-hours pain',
-    lines: [
-      "Hi, I'm Priya, I run operations at Lakeside Dermatology. We have 12 providers and we're on ModMed.",
-      'Scheduling, benefits checks and prior auths. Prior auths for biologics are killing us, and after hours is the worst. Around 600 calls a day.',
-      "We greet everyone by name and tell them we're glad they called. Anyone anxious about a biopsy result should always get a human. English and Spanish.",
-      'Sure, play Kate.',
-      "priya@lakesidederm.com, I'm the director of operations.",
-      'Yes, send it.',
-    ],
-  },
-  {
-    id: 'obgyn',
-    label: 'OBGYN group',
-    detail: '8 providers · eClinicalWorks · morning pain',
-    lines: [
-      "This is Dana, practice manager at Harbor Women's Health. We're an OB-GYN group, 8 providers, on eClinicalWorks.",
-      'Mostly scheduling and billing questions. Mornings are brutal, about 400 calls a day.',
-      "Warm and unhurried, a lot of our patients are expecting for the first time. Anyone mentioning bleeding or pain goes to a nurse immediately. English and Spanish.",
-      'Yes, let me hear Anna.',
-      "dana@harborwomens.com, I'm the practice manager.",
-      'Yes please.',
-    ],
-  },
-  {
-    id: 'gi',
-    label: 'GI practice',
-    detail: '20 providers · athenahealth · all-day pain',
-    lines: [
-      "I'm Marcus, COO of Summit Gastroenterology. 20 providers, and we run athenahealth.",
-      "Scheduling, prior authorizations, and claims follow-up. It's all day, honestly, over a thousand calls a day.",
-      'Calm and clear, a lot of people are nervous about colonoscopy prep. Anyone confused about prep instructions should always be offered a person. Just English.',
-      'No, I think I get it.',
-      "marcus@summitgi.com, I'm the COO.",
-      'Go ahead and send it.',
-    ],
-  },
+export const SPECIALTIES: Specialty[] = [
+  { id: 'derm', label: 'Dermatology', visit: 'skin check', followup: 'biopsy results', procedure: 'Mohs surgery', medication: 'a biologic for psoriasis', human: "you're worried about a biopsy result" },
+  { id: 'obgyn', label: 'OB-GYN', visit: 'prenatal visit', followup: 'ultrasound results', procedure: 'ultrasound', medication: 'a fertility medication', human: "you're having any bleeding or pain" },
+  { id: 'gi', label: 'Gastroenterology', visit: 'colonoscopy', followup: 'prep instructions', procedure: 'colonoscopy', medication: "a biologic for Crohn's", human: 'anything about your prep is confusing' },
+  { id: 'ortho', label: 'Orthopedics', visit: 'knee follow-up', followup: 'MRI results', procedure: 'knee MRI', medication: 'a knee injection', human: "you're in a lot of pain" },
+  { id: 'primary', label: 'Primary care', visit: 'annual physical', followup: 'lab results', procedure: 'sleep study', medication: 'a GLP-1 medication', human: 'something feels urgent' },
+  { id: 'cardio', label: 'Cardiology', visit: 'heart checkup', followup: 'echo results', procedure: 'stress test', medication: 'a new heart medication', human: 'you have any chest pain' },
 ]
 
-export interface SampleLine {
-  who: 'agent' | 'patient'
+export interface Line {
+  who: 'agent' | 'other'
   text: string
 }
 
-export function sampleCall(id: AgentId, practice: string): SampleLine[] {
-  const p = practice || 'the practice'
-  const scripts: Partial<Record<AgentId, SampleLine[]>> = {
-    anna: [
-      { who: 'agent', text: `Thanks for calling ${p}, this is Anna. How can I help today?` },
-      { who: 'patient', text: 'Hi, I need to move my appointment on Thursday.' },
-      { who: 'agent', text: 'Of course. I see you with Doctor Lee Thursday at ten. Would next Monday at nine work instead?' },
-      { who: 'patient', text: 'Monday works.' },
-      { who: 'agent', text: "You're all set for Monday at nine. I'll text you a confirmation. Anything else I can do for you?" },
-    ],
-    kate: [
-      { who: 'agent', text: `Hi, this is Kate calling from ${p} about a prior authorization for a patient.` },
-      { who: 'patient', text: 'Sure, what is the member ID?' },
-      { who: 'agent', text: "It's on file under the reference I sent this morning. We're requesting approval for the biologic Doctor Patel prescribed. Can you tell me what's still needed?" },
-      { who: 'patient', text: 'We just need the last chart note. Then it goes to review.' },
-      { who: 'agent', text: "Perfect, I'll fax that over now and call back Thursday to check the status. Thank you so much." },
-    ],
-    alex: [
-      { who: 'agent', text: `Hi, this is Alex from ${p}, calling to verify benefits for an upcoming visit.` },
-      { who: 'patient', text: 'Go ahead.' },
-      { who: 'agent', text: 'Can you confirm the specialist copay and whether the deductible has been met this year?' },
-      { who: 'patient', text: "Forty dollar copay. Deductible's met." },
-      { who: 'agent', text: "Great, I'll note that in the chart so the patient knows what to expect. Thank you." },
-    ],
-    emma: [
-      { who: 'agent', text: `Thanks for calling ${p} billing, this is Emma.` },
-      { who: 'patient', text: "I got a bill and I don't understand why I owe anything." },
-      { who: 'agent', text: "I completely understand, these can be confusing. Your insurance covered most of the visit, and the eighty dollars left is your annual deductible. Would it help if I set up a payment plan?" },
-      { who: 'patient', text: 'Yes, that would help.' },
-      { who: 'agent', text: "Done. Four payments of twenty dollars, starting next month. I'll text you the details." },
-    ],
+const a = (text: string): Line => ({ who: 'agent', text })
+const o = (text: string): Line => ({ who: 'other', text })
+
+export function sampleCall(id: AgentId, practice: string, s: Specialty): Line[] {
+  const p = practice || 'your practice'
+  switch (id) {
+    case 'anna': return [
+      a(`Thanks for calling ${p}, this is Anna. How can I help?`),
+      o(`Hi, I need to move my ${s.visit} on Thursday.`),
+      a('Of course. Doctor Lee has Monday at nine or Tuesday at two. Which works better for you?'),
+      o('Monday, please.'),
+      a("You're all set for Monday at nine. I'll text you a confirmation."),
+    ]
+    case 'tom': return [
+      a(`Hi, this is Tom from ${p}, confirming your ${s.visit} tomorrow at ten with Doctor Lee.`),
+      o("Oh no, I can't make it tomorrow."),
+      a('No problem at all. I can move you to Thursday at ten, or Friday at one.'),
+      o('Friday works.'),
+      a('Friday at one it is. See you then.'),
+    ]
+    case 'jack': return [
+      a(`Thank you for calling ${p}, this is Jack. How can I direct your call?`),
+      o(`I have a question about my ${s.followup}.`),
+      a("Got it. That's our nursing team. I'm connecting you now, and I've noted your question so you won't have to repeat it."),
+    ]
+    case 'james': return [
+      a(`${p}, this is James. How can I help?`),
+      o("I'm almost out of my prescription and need a refill."),
+      a("Happy to help. I'm sending the request to Doctor Lee now, and you'll get a text when it's ready at your pharmacy."),
+    ]
+    case 'sara': return [
+      a(`Hi, this is Sara from ${p}. It's been about a year since your last ${s.visit}, and Doctor Lee wanted to check in.`),
+      o("Oh, I've been meaning to book that."),
+      a('I can get you in next Wednesday at eleven. Want me to hold it for you?'),
+      o('Yes, please.'),
+    ]
+    case 'emma': return [
+      a(`${p} billing, this is Emma.`),
+      o(`I got a bill after my ${s.visit} and I don't understand why I owe anything.`),
+      a("That's a fair question, these can be confusing. Insurance covered most of it, and the eighty dollars left is your deductible. Want me to split it into four payments?"),
+      o('Yes, that would help.'),
+      a('Done. Twenty dollars a month, starting next month.'),
+    ]
+    case 'ben': return [
+      a(`Hi, this is Ben from ${p}. I'm calling about a small balance from your ${s.visit}. Is now an okay time?`),
+      o('Sure, how much is it?'),
+      a("It's sixty-five dollars. I can take a card now, or text you a secure link."),
+      o('Text me the link.'),
+      a('Sent. Thanks so much, and no rush.'),
+    ]
+    case 'alex': return [
+      a(`Hi, this is Alex calling from ${p} to verify benefits for an upcoming ${s.visit}.`),
+      o('Sure, go ahead.'),
+      a('Can you confirm the specialist copay, and whether the deductible has been met?'),
+      o("Forty dollar copay, and the deductible's met."),
+      a("Perfect. I'll note that so the patient knows what to expect."),
+    ]
+    case 'kate': return [
+      a(`Hi, this is Kate from ${p}, following up on a prior authorization for ${s.medication}.`),
+      o('I see it. We still need the latest chart note.'),
+      a("I'll fax it over now and call back Thursday to check the status. Thank you."),
+    ]
+    case 'lucy': return [
+      a(`Hi, this is Lucy from ${p}, checking on a claim for a ${s.procedure} from August.`),
+      o("That claim's still in review."),
+      a("Thanks. Is anything missing on our side, and when's the decision expected?"),
+      o('Nothing missing. Decision by the thirtieth.'),
+      a("Great, I'll log that in the chart."),
+    ]
+    case 'mary': return [
+      a(`Hi, this is Mary from ${p}, calling about a denied claim for a ${s.procedure}.`),
+      o('It was denied for missing medical necessity documentation.'),
+      a("Understood. What's the appeal deadline, and where should we send the records?"),
+      o('Sixty days, by fax.'),
+      a("Thank you. I'll get the appeal started today."),
+    ]
   }
-  return scripts[id] ?? [
-    { who: 'agent', text: `Hi, this is ${AGENTS[id].name} from ${p}.` },
-    { who: 'agent', text: `I handle ${AGENTS[id].role.toLowerCase()}, so your team can focus on the patients in front of them.` },
-  ]
 }
 
-export function greetingScript(profile: Profile, warm: boolean): string {
-  const practice = profile.practice || 'your practice'
+export function greeting(practice: string, s: Specialty, warm: boolean): string {
+  const p = practice || 'your practice'
   if (!warm) {
-    return `Thank you for calling ${practice}. Please state the reason for your call. For scheduling, say scheduling. For billing, say billing. Please hold while I process your request.`
+    return `Thank you for calling ${p}. Please state the reason for your call. For scheduling, say scheduling. For billing, say billing. Please hold while I process your request.`
   }
-  const human = profile.humanTrigger
-    ? ` And if ${profile.humanTrigger.replace(/\.$/, '')}, I'll get you to someone on our team right away.`
-    : " And if you'd rather talk to someone on our team, just say so and I'll connect you."
-  const spanish = profile.languages.includes('Spanish') ? ' También puedo ayudarle en español.' : ''
-  return `Hi Maria, thanks for calling ${practice}, this is Anna. I see you're due for your follow-up. I know rescheduling can be stressful, so let's find a time that actually works for you. I'll ask a couple of quick questions so your visit goes smoothly.${human}${spanish}`
+  return `Hi Maria, thanks for calling ${p}, this is Anna. I see you're due for your ${s.visit}. I know scheduling can be stressful, so let's find a time that actually works for you. And if ${s.human}, I'll get you to someone on our team right away.`
 }
+
+export const PRESETS: { practice: string; specialty: string }[] = [
+  { practice: 'Lakeside Dermatology', specialty: 'derm' },
+  { practice: "Harbor Women's Health", specialty: 'obgyn' },
+  { practice: 'Summit Gastroenterology', specialty: 'gi' },
+]
